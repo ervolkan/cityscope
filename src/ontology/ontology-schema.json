@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ervolkan/cityscope/ontology-schema.json",
+  "title": "CityScope Ontology Schema",
+  "description": "JSON Schema for CityScope infrastructure ontology entity declarations. Defines entity types, relationship types, lifecycle states, and constraint rules.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "const": "cityscope.dev/v1",
+      "description": "API version of the declaration manifest format."
+    },
+    "kind": {
+      "type": "string",
+      "const": "Entity",
+      "description": "Resource kind — always 'Entity'."
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["id", "name", "domain", "team", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$",
+          "description": "Globally unique entity identifier. Lowercase alphanumeric with hyphens, 3-63 chars."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Human-readable entity name."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Bounded context / domain this entity belongs to. Must be registered in domains.yaml."
+        },
+        "team": {
+          "type": "string",
+          "description": "Owning team identifier. Must be registered in teams.yaml."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 500,
+          "description": "Purpose and responsibility of this entity in the system."
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Optional key-value labels for categorization."
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Optional key-value annotations for tooling."
+        }
+      },
+      "additionalProperties": false
+    },
+    "spec": {
+      "type": "object",
+      "required": ["type", "tier", "lifecycle"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "service",
+            "gateway",
+            "datastore",
+            "cache",
+            "messagebus",
+            "storage",
+            "compute",
+            "network"
+          ],
+          "description": "Entity type classification."
+        },
+        "tier": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "Criticality tier. 0 = most critical (customer-facing core), 3 = non-critical internal."
+        },
+        "lifecycle": {
+          "type": "string",
+          "enum": ["provisioning", "active", "deprecated", "retired"],
+          "description": "Current lifecycle state of the entity."
+        },
+        "protocols": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "port"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": ["http", "https", "grpc", "grpc-web", "tcp", "udp", "orleans", "amqp", "redis", "postgres", "mssql"]
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "Network port number."
+              },
+              "description": {
+                "type": "string",
+                "description": "Optional description of what this protocol endpoint serves."
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Network protocols this entity exposes."
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["target", "type"],
+            "properties": {
+              "target": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$",
+                "description": "Entity ID this service depends on. Must exist in the ontology."
+              },
+              "type": {
+                "type": "string",
+                "enum": ["sync", "async", "storage", "cache", "infra"],
+                "description": "Dependency communication type."
+              },
+              "protocol": {
+                "type": "string",
+                "enum": ["http", "grpc", "amqp", "redis", "postgres", "mssql", "tcp", "s3"],
+                "description": "Protocol used for this dependency. Required for sync and storage types."
+              },
+              "critical": {
+                "type": "boolean",
+                "default": false,
+                "description": "If true, this entity cannot function without the dependency."
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 300000,
+                "description": "Request timeout in milliseconds. Required for sync dependencies."
+              },
+              "description": {
+                "type": "string",
+                "description": "Optional description of why this dependency exists."
+              }
+            },
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "type": { "const": "sync" } }
+                },
+                "then": {
+                  "required": ["protocol", "timeout_ms"]
+                }
+              },
+              {
+                "if": {
+                  "properties": { "type": { "const": "storage" } }
+                },
+                "then": {
+                  "required": ["protocol"]
+                }
+              }
+            ]
+          },
+          "description": "Service dependencies — other entities this one relies on."
+        },
+        "scaling": {
+          "type": "object",
+          "description": "Scaling configuration for this entity.",
+          "properties": {
+            "min_replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum number of replicas."
+            },
+            "max_replicas": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum number of replicas."
+            },
+            "current_replicas": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Current replica count."
+            },
+            "strategy": {
+              "type": "string",
+              "enum": ["static", "hpa", "keda", "manual"],
+              "description": "Scaling strategy in use."
+            },
+            "triggers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of scaling trigger identifiers."
+            }
+          },
+          "additionalProperties": false
+        },
+        "slo": {
+          "type": "object",
+          "description": "Service Level Objective targets. Required for tier-0 and tier-1 entities.",
+          "properties": {
+            "availability_percent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Target availability percentage (e.g., 99.9)."
+            },
+            "latency_p99_ms": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Target p99 latency in milliseconds."
+            },
+            "latency_p95_ms": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Target p95 latency in milliseconds."
+            },
+            "error_rate_percent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Maximum acceptable error rate percentage."
+            },
+            "throughput_rps": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Target throughput in requests per second."
+            }
+          },
+          "additionalProperties": false
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9._\\-/]+(:[a-zA-Z0-9._-]+)?(@sha256:[a-f0-9]{64})?$",
+          "description": "Container image reference."
+        },
+        "retirement_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Planned or actual retirement date. Required when lifecycle is 'deprecated' or 'retired'."
+        },
+        "backup": {
+          "type": "object",
+          "description": "Backup and retention configuration. Required for datastore entities.",
+          "required": ["enabled", "retention_days"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether backups are enabled."
+            },
+            "retention_days": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of days to retain backups."
+            },
+            "frequency": {
+              "type": "string",
+              "enum": ["hourly", "daily", "weekly", "monthly"],
+              "description": "Backup frequency."
+            },
+            "storage_location": {
+              "type": "string",
+              "description": "Where backups are stored (e.g., S3 bucket name)."
+            }
+          },
+          "additionalProperties": false
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Free-form metadata for custom tooling and annotations."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "EntityType": {
+      "type": "string",
+      "enum": ["service", "gateway", "datastore", "cache", "messagebus", "storage", "compute", "network"],
+      "description": "Valid entity type classifications."
+    },
+    "DependencyType": {
+      "type": "string",
+      "enum": ["sync", "async", "storage", "cache", "infra"],
+      "description": "Types of dependencies an entity can have."
+    },
+    "LifecycleState": {
+      "type": "string",
+      "enum": ["provisioning", "active", "deprecated", "retired"],
+      "description": "Lifecycle states. Valid transitions: provisioning→active, active→deprecated, deprecated→retired."
+    },
+    "Tier": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3],
+      "description": "Criticality tier. 0=customer-facing core, 1=important business, 2=supporting, 3=internal/tooling."
+    }
+  }
+}

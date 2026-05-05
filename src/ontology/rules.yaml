@@ -1,0 +1,203 @@
+# CityScope Ontology Rules
+# Enforced by the registration pipeline during CI validation.
+# Each rule has an id, severity, description, and validation logic reference.
+
+---
+# R001: Tier dependency constraint
+id: R001
+severity: error
+description: >
+  A tier-0 service cannot depend on a tier-3 service. Critical customer-facing
+  services must not have dependencies on non-critical internal tooling.
+applies_to:
+  - service
+  - gateway
+validation:
+  type: tier_dependency_check
+  rule: >
+    For each entity E with tier=0, none of its depends_on targets may have tier=3.
+
+---
+# R002: Team ownership
+id: R002
+severity: error
+description: >
+  Every service entity must have at least one owner team assigned.
+  Unowned services are a risk during incidents.
+applies_to:
+  - service
+  - gateway
+validation:
+  type: required_field_check
+  rule: >
+    metadata.team must be non-empty and must reference a valid team in teams.yaml.
+
+---
+# R003: Datastore backup configuration
+id: R003
+severity: error
+description: >
+  All datastore entities must have explicit backup and retention configuration.
+  Unbacked data stores are a single point of failure.
+applies_to:
+  - datastore
+validation:
+  type: required_field_check
+  rule: >
+    spec.backup must exist with enabled=true and retention_days >= 7.
+
+---
+# R004: Sync dependency protocol and timeout
+id: R004
+severity: error
+description: >
+  All synchronous dependencies must specify both the protocol and the timeout.
+  Without these, the system cannot model latency accurately or detect SLO risk.
+applies_to:
+  - service
+  - gateway
+validation:
+  type: required_field_check
+  rule: >
+    For each depends_on entry with type=sync, both protocol and timeout_ms must be set.
+
+---
+# R005: Cross-domain dependency flag
+id: R005
+severity: warning
+description: >
+  Dependencies that cross domain boundaries must be flagged for architectural review.
+  Cross-domain coupling increases blast radius and complicates deployments.
+applies_to:
+  - service
+  - gateway
+  - datastore
+validation:
+  type: cross_domain_check
+  rule: >
+    For each depends_on entry, if the target entity's domain differs from this entity's domain,
+    the dependency must include description explaining the cross-domain need.
+
+---
+# R006: Lifecycle state transitions
+id: R006
+severity: error
+description: >
+  Lifecycle state transitions must follow valid paths:
+  provisioning → active → deprecated → retired
+  Direct transitions (e.g., provisioning → retired) are not allowed.
+applies_to:
+  - service
+  - gateway
+  - datastore
+  - cache
+  - messagebus
+  - storage
+  - compute
+  - network
+validation:
+  type: lifecycle_transition_check
+  rule: >
+    Valid transitions: provisioning→active, active→deprecated, deprecated→retired.
+    Any other transition is invalid.
+
+---
+# R007: SLO targets for critical tiers
+id: R007
+severity: error
+description: >
+  Tier-0 and tier-1 services must have explicit SLO targets defined.
+  Without SLOs, the Event Bridge cannot determine severity thresholds.
+applies_to:
+  - service
+  - gateway
+validation:
+  type: required_field_check
+  rule: >
+    For entities with tier=0 or tier=1, spec.slo must exist with at least
+    availability_percent and latency_p99_ms defined.
+
+---
+# R008: No circular dependencies
+id: R008
+severity: error
+description: >
+  The dependency graph must be a directed acyclic graph (DAG).
+  Circular dependencies create cascading failure risks and complicate deployments.
+applies_to:
+  - service
+  - gateway
+validation:
+  type: cycle_detection
+  rule: >
+    Run topological sort on the depends_on graph. Any cycle detected is an error.
+
+---
+# R009: Globally unique entity IDs
+id: R009
+severity: error
+description: >
+  Entity IDs must be globally unique across all declarations.
+  Duplicate IDs create ambiguity in the knowledge graph.
+applies_to:
+  - service
+  - gateway
+  - datastore
+  - cache
+  - messagebus
+  - storage
+  - compute
+  - network
+validation:
+  type: uniqueness_check
+  rule: >
+    All metadata.id values across all declarations must be unique.
+
+---
+# R010: Deprecated entity retirement date
+id: R010
+severity: error
+description: >
+  Entities with lifecycle state 'deprecated' or 'retired' must have a retirement_date.
+  This allows capacity planning and ensures decommissioning is tracked.
+applies_to:
+  - service
+  - gateway
+  - datastore
+  - cache
+  - messagebus
+  - storage
+  - compute
+  - network
+validation:
+  type: required_field_check
+  rule: >
+    If spec.lifecycle is 'deprecated' or 'retired', spec.retirement_date must be set.
+
+---
+# R011: Gateway must have downstream services
+id: R011
+severity: warning
+description: >
+  Gateway entities should have at least one sync dependency representing
+  a downstream service they route traffic to.
+applies_to:
+  - gateway
+validation:
+  type: minimum_dependency_check
+  rule: >
+  Gateway entities must have at least one depends_on entry with type=sync.
+
+---
+# R012: Compute entities must belong to a network
+id: R012
+severity: warning
+description: >
+  Compute entities (EKS nodes, etc.) must declare a dependency on a network entity
+  to ensure infrastructure topology is complete.
+applies_to:
+  - compute
+validation:
+  type: minimum_dependency_check
+  rule: >
+  Compute entities must have at least one depends_on entry with type=infra targeting a network entity.

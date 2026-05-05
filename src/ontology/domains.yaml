@@ -1,0 +1,49 @@
+# Domain Registry
+# Bounded contexts for the NEXUS platform.
+# Each entity must reference a valid domain in its metadata.domain field.
+#
+# Adding a new domain:
+# 1. Add an entry here with id, name, and description
+# 2. Create a PR for review by the Ontology Architect
+
+---
+- id: nexus-core
+  name: Nexus Core
+  description: >
+    Core iGaming platform services: wallet, payment, customer management,
+    and bonus systems. Directly handles customer transactions.
+
+- id: nexus-ai
+  name: Nexus AI
+  description: >
+    AI/ML services for personalization, fraud detection, and recommendation engines.
+
+- id: nexus-observability
+  name: Nexus Observability
+  description: >
+    Monitoring, logging, tracing, and alerting infrastructure. LGTM stack.
+
+- id: nexus-compliance
+  name: Nexus Compliance
+  description: >
+    Regulatory compliance, audit logging, and responsible gaming systems.
+
+- id: nexus-infra
+  name: Nexus Infrastructure
+  description: >
+    Platform infrastructure: networking, compute, storage, caching, message brokers.
+
+- id: nexus-gateway
+  name: Nexus Gateway
+  description: >
+    External traffic entry points: load balancers, CDN, API gateways, reverse proxies.
+
+- id: nexus-backoffice
+  name: Nexus Backoffice
+  description: >
+    Internal admin tools, reporting dashboards, and operational support systems.
+
+- id: nexus-integration
+  name: Nexus Integration
+  description: >
+    Third-party integrations: payment providers, game providers, KYC services.

@@ -1,0 +1,86 @@
+# Example: Nexus Wallet Service
+# This is a sample entity declaration manifest.
+# Use this as a template when creating new declarations.
+#
+# IMPORTANT: This file contains TODO fields that must be filled by engineers.
+# Fields marked with <TODO: ...> are not auto-extractable from IaC.
+
+---
+apiVersion: cityscope.dev/v1
+kind: Entity
+
+metadata:
+  # Unique identifier — must match the service name in Helm/Terraform
+  id: nexus-wallet
+  # Human-readable name
+  name: Nexus Wallet Service
+  # Bounded context — see src/ontology/domains.yaml for valid values
+  # <TODO: assign domain>
+  domain: nexus-core
+  # Owning team — see src/ontology/teams.yaml for valid values
+  # <TODO: assign team>
+  team: nexus-backend
+  # What this service does
+  # <TODO: write description>
+  description: >
+    Handles customer wallet operations including deposits,
+    withdrawals, and balance management for the iGaming platform.
+
+spec:
+  # Entity type — one of: service, gateway, datastore, cache, messagebus, storage, compute, network
+  type: service
+  # Criticality tier — 0 (most critical) to 3 (non-critical/internal)
+  # <TODO: assign tier>
+  tier: 0
+  # Lifecycle state — provisioning, active, deprecated, retired
+  lifecycle: active
+  # Network protocols exposed by this entity
+  protocols:
+    - name: grpc
+      port: 8080
+      description: gRPC service endpoint
+    - name: http
+      port: 8081
+      description: Health check endpoint
+  # Dependencies on other entities
+  depends_on:
+    - target: nexus-db-wallet
+      type: storage
+      protocol: postgres
+      critical: true
+      description: Primary wallet database
+    - target: nexus-redis-cache
+      type: cache
+      protocol: redis
+      critical: false
+      description: Session and rate-limit cache
+    - target: nexus-identity
+      type: sync
+      protocol: grpc
+      timeout_ms: 2000
+      critical: true
+      description: User identity verification
+  # Scaling configuration
+  scaling:
+    min_replicas: 2
+    max_replicas: 10
+    current_replicas: 3
+    strategy: hpa
+    triggers:
+      - cpu-usage-above-70
+      - p99-latency-above-500ms
+  # SLO targets — required for tier-0 and tier-1
+  slo:
+    availability_percent: 99.99
+    latency_p99_ms: 200
+    latency_p95_ms: 100
+    error_rate_percent: 0.1
+    throughput_rps: 5000
+  # Container image
+  image: ghcr.io/betcorewin/nexus-wallet:latest
+
+# Free-form metadata for custom tooling
+metadata:
+  # Additional custom fields go here
+  cost_center: gaming-platform
+  compliance_scope: true

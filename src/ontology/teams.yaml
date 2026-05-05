@@ -1,0 +1,53 @@
+# Team Registry
+# Valid team identifiers for entity ownership.
+# Each entity must reference a valid team in its metadata.team field.
+#
+# Adding a new team:
+# 1. Add an entry here with id, name, and description
+# 2. Assign a team lead (for incident contact)
+# 3. Create a PR for review by the Ontology Architect
+
+---
+- id: nexus-platform
+  name: Nexus Platform Team
+  description: >
+    Core platform engineering: infrastructure, CI/CD, deployment pipelines,
+    and developer tooling.
+  lead: TBA
+  contact: "#nexus-platform"
+
+- id: nexus-backend
+  name: Nexus Backend Team
+  description: >
+    Backend microservices: wallet, payment, customer, bonus, and compliance services.
+  lead: TBA
+  contact: "#nexus-backend"
+
+- id: nexus-frontend
+  name: Nexus Frontend Team
+  description: >
+    Frontend applications: web client, mobile web, and admin dashboard.
+  lead: TBA
+  contact: "#nexus-frontend"
+
+- id: nexus-data
+  name: Nexus Data Team
+  description: >
+    Data engineering, analytics, and AI/ML services.
+  lead: TBA
+  contact: "#nexus-data"
+
+- id: nexus-sre
+  name: Nexus SRE Team
+  description: >
+    Site reliability engineering: monitoring, alerting, incident response,
+    and infrastructure reliability.
+  lead: TBA
+  contact: "#nexus-sre"
+
+- id: nexus-security
+  name: Nexus Security Team
+  description: >
+    Security engineering: identity, access management, compliance, and audit.
+  lead: TBA
+  contact: "#nexus-security"
