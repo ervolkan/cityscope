@@ -1,0 +1,6 @@
+# Placeholder
+
+This directory contains entity declaration manifests.
+Each YAML file describes one infrastructure entity (service, datastore, gateway, etc.)
+
+See the ontology schema in `src/ontology/ontology-schema.json` for the format.
