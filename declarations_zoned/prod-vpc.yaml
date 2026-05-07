@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: prod-vpc
+  name: VPC prod_vpc
+  domain: infrastructure
+  team: platform-infra
+  description: VPC
+spec:
+  type: network
+  tier: 1
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: SUBSTRATE

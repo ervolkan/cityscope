@@ -1,0 +1,46 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: bo-thirdpartymanagement-api
+  name: Prod Bo Thirdpartymanagement Api
+  domain: wincore-mssql
+  team: nexus-backoffice
+  description: Auto-bootstrapped from bo-thirdpartymanagement-api-values.yaml
+  labels:
+    service_type: NodePort
+    nodePort: '32719'
+    external_traffic: 'true'
+spec:
+  type: service
+  tier: 1
+  lifecycle: active
+  protocols:
+  - name: http
+    port: 80
+    description: api
+  depends_on:
+  - target: mssql-10-2-152-240
+    type: storage
+    protocol: mssql
+    critical: true
+    description: MSSQL 'NSWT.Casino' via NSWT__Data__SqlServerConnectionString
+  - target: rabbitmq-10-2-160-192
+    type: async
+    protocol: amqp
+    critical: false
+    description: RabbitMQ via NSWT__DomainEvents__RabbitMQ__HostName
+  - target: sd-logmanagement-api
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Logger__LogCenterGrpcHost
+  - target: identity-service
+    type: sync
+    protocol: http
+    critical: true
+    description: 'initContainer: prod-identity-service'
+  image: thirdparty.api:9d55b52
+  scaling:
+    current_replicas: 1
+  nature: PROCESSOR
+  sub_nature: REACTOR

@@ -1,0 +1,16 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: srv-cashout-provider-service
+  name: Srv Cashout Provider Service
+  domain: wincore-mssql
+  team: wincore-backend
+  description: Service (implicit)
+spec:
+  type: service
+  tier: 2
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: PROCESSOR
+  sub_nature: WORKER

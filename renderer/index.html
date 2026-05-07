@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CityScope — Infrastructure City</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0e17;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            color: #e0e0e0;
+        }
+        #canvas-container { width: 100vw; height: 100vh; }
+        canvas { display: block; }
+
+        /* HUD Overlay */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        #hud h1 {
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+            margin-bottom: 8px;
+        }
+        #hud .subtitle {
+            font-size: 12px;
+            color: #667;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Legend */
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(10, 14, 23, 0.92);
+            border: 1px solid rgba(0, 212, 255, 0.12);
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 12px;
+            backdrop-filter: blur(8px);
+        }
+        #legend h3 {
+            color: #00d4ff;
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: 400;
+        }
+        .legend-section { margin-bottom: 14px; }
+        .legend-section:last-child { margin-bottom: 0; }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+            font-size: 11px;
+        }
+        .legend-shape {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .legend-shape svg { width: 16px; height: 16px; }
+
+        /* Stats */
+        #stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(10, 14, 23, 0.92);
+            border: 1px solid rgba(0, 212, 255, 0.12);
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 12px;
+            min-width: 200px;
+            backdrop-filter: blur(8px);
+        }
+        #stats h3 {
+            color: #00d4ff;
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: 400;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .stat-label { color: #889; font-size: 11px; }
+        .stat-value { color: #fff; font-weight: 600; font-size: 11px; }
+        .stat-section {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        .stat-section-title {
+            color: #556;
+            font-size: 9px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        /* Tooltip */
+        #tooltip {
+            position: absolute;
+            display: none;
+            z-index: 100;
+            background: rgba(8, 12, 20, 0.96);
+            border: 1px solid rgba(0, 212, 255, 0.25);
+            border-radius: 8px;
+            padding: 14px 18px;
+            font-size: 13px;
+            max-width: 360px;
+            pointer-events: none;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+        }
+        #tooltip .tip-id {
+            color: #00d4ff;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        #tooltip .tip-nature {
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        #tooltip .tip-detail {
+            color: #99a;
+            font-size: 11px;
+            margin-bottom: 3px;
+        }
+        #tooltip .tip-desc {
+            color: #bbc;
+            font-size: 12px;
+            line-height: 1.4;
+            margin-top: 6px;
+        }
+
+        /* Loading */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            text-align: center;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loading p {
+            color: #667;
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Controls hint */
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10;
+            color: #445;
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+
+        /* Event Feed */
+        #event-feed {
+            position: absolute;
+            bottom: 60px;
+            right: 20px;
+            z-index: 10;
+            background: rgba(10, 14, 23, 0.92);
+            border: 1px solid rgba(0, 212, 255, 0.12);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 11px;
+            width: 290px;
+            backdrop-filter: blur(8px);
+        }
+        #event-feed h3 {
+            color: #00d4ff;
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .event-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            animation: fadeInEvent 0.25s ease;
+        }
+        .event-item:last-child { border-bottom: none; }
+        @keyframes fadeInEvent {
+            from { opacity: 0; transform: translateX(6px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+        .event-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .event-entity { color: #00d4ff; font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .event-label { flex: 1; color: #667; }
+
+        /* Bridge connection status */
+        #bridge-status {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            font-size: 10px;
+            letter-spacing: 1px;
+            padding: 4px 14px;
+            border-radius: 4px;
+            background: rgba(10, 14, 23, 0.9);
+            border: 1px solid rgba(0,212,255,0.15);
+            display: none;
+            white-space: nowrap;
+        }
+        .st-connecting   { color: #ffaa00; }
+        .st-connected    { color: #00ff88; }
+        .st-disconnected { color: #ff4444; }
+
+        /* Domain label overlays */
+        .domain-label-3d { pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="hud">
+        <h1>CityScope</h1>
+        <div class="subtitle">NEXUS Infrastructure Ontology</div>
+    </div>
+
+    <div id="stats">
+        <h3>City Census</h3>
+        <div id="stats-content"></div>
+    </div>
+
+    <div id="legend">
+        <h3>Natures</h3>
+        <div class="legend-section" id="nature-legend"></div>
+        <h3>Domains</h3>
+        <div class="legend-section" id="domain-legend"></div>
+    </div>
+
+    <div id="tooltip"></div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading CityScope...</p>
+    </div>
+    <div id="controls-hint">Scroll: zoom · Left-drag: rotate · Right-drag: pan</div>
+    <div id="bridge-status"></div>
+    <div id="event-feed">
+        <h3>Live Events <span id="event-count" style="color:#445;font-weight:400;">—</span></h3>
+        <div id="event-list"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+    (function() {
+        'use strict';
+
+        // ══════════════════════════════════════════════════════════════
+        // CONFIGURATION
+        // ══════════════════════════════════════════════════════════════
+
+        const NATURE_CONFIG = {
+            NUCLEUS:   { color: 0xff3344, emissive: 0xff1122, glow: 0xff3344, label: 'Nucleus',   desc: 'Critical datastore' },
+            CONDUIT:   { color: 0xff9900, emissive: 0xcc6600, glow: 0xff9900, label: 'Conduit',   desc: 'Message bus' },
+            MEMBRANE:  { color: 0x22ddaa, emissive: 0x11aa77, glow: 0x22ddaa, label: 'Membrane',  desc: 'External gateway' },
+            SUBSTRATE: { color: 0x5577bb, emissive: 0x334488, glow: 0x5577bb, label: 'Substrate', desc: 'Infrastructure' },
+            SENTINEL:  { color: 0xeedd00, emissive: 0xbbaa00, glow: 0xeedd00, label: 'Sentinel',  desc: 'High-CFI narrow-protocol' },
+            REACTOR:   { color: 0x7744ff, emissive: 0x5522cc, glow: 0x7744ff, label: 'Reactor',   desc: 'Fan-in + fan-out processor' },
+            WORKER:    { color: 0x4488cc, emissive: 0x225588, glow: 0x4488cc, label: 'Worker',    desc: 'General processor' },
+        };
+
+        const DOMAIN_CONFIG = {
+            'standalone':    { cx:  0, cz:  0, radius: 22, color: 0x443322, label: 'Standalone / Cross-Domain' },
+            'wincore-mssql': { cx:-38, cz: 20, radius: 32, color: 0x331a1a, label: 'WinCore · MSSQL' },
+            'app-postgres':  { cx: 38, cz: 20, radius: 22, color: 0x1a2233, label: 'App · PostgreSQL' },
+            'infrastructure':{ cx:  0, cz:-35, radius: 30, color: 0x1a2a1a, label: 'Infrastructure' },
+        };
+
+        const TIER_ELEVATION = { 0: 0, 1: 0, 2: 0, 3: 0 }; // y-offset per tier (kept flat for now, height encodes importance)
+
+        // ══════════════════════════════════════════════════════════════
+        // SCENE SETUP
+        // ══════════════════════════════════════════════════════════════
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0e17);
+        scene.fog = new THREE.FogExp2(0x0a0e17, 0.003);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(70, 90, 70);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.7;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 15;
+        controls.maxDistance = 250;
+        controls.maxPolarAngle = Math.PI / 2.15;
+        controls.target.set(0, 5, 0);
+
+        // ── Lighting ──
+        scene.add(new THREE.AmbientLight(0x334466, 1.0));
+
+        const dirLight = new THREE.DirectionalLight(0xddeeff, 1.2);
+        dirLight.position.set(60, 100, 40);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 10;
+        dirLight.shadow.camera.far = 250;
+        dirLight.shadow.camera.left = -100;
+        dirLight.shadow.camera.right = 100;
+        dirLight.shadow.camera.top = 100;
+        dirLight.shadow.camera.bottom = -100;
+        scene.add(dirLight);
+
+        const fillLight = new THREE.DirectionalLight(0x4466aa, 0.4);
+        fillLight.position.set(-40, 30, -60);
+        scene.add(fillLight);
+
+        // Subtle blue point light at center
+        const centerLight = new THREE.PointLight(0x0044ff, 0.6, 80);
+        centerLight.position.set(0, 25, 0);
+        scene.add(centerLight);
+
+        // ── Ground ──
+        const groundGeo = new THREE.PlaneGeometry(400, 400);
+        const groundMat = new THREE.MeshStandardMaterial({
+            color: 0x0e1520,
+            roughness: 0.9,
+            metalness: 0.1,
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.05;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Subtle grid
+        const gridHelper = new THREE.GridHelper(300, 120, 0x1a2540, 0x121a2a);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        // ── Groups ──
+        const buildingsGroup = new THREE.Group();
+        const linesGroup = new THREE.Group();
+        const domainGroup = new THREE.Group();
+        const labelsGroup = new THREE.Group();
+        scene.add(domainGroup, buildingsGroup, linesGroup, labelsGroup);
+
+        // ── Data structures ──
+        const entityMeshes = [];     // for raycasting
+        const entityDataMap = new Map(); // id → { entity, group, position }
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredMesh = null;
+
+        // ══════════════════════════════════════════════════════════════
+        // GEOMETRY FACTORIES
+        // ══════════════════════════════════════════════════════════════
+
+        function getNatureKey(entity) {
+            const nature = entity.spec?.nature || 'PROCESSOR';
+            const sub = entity.spec?.sub_nature || '';
+            if (nature === 'PROCESSOR') return sub || 'WORKER';
+            return nature;
+        }
+
+        function createNucleusGeometry(entity) {
+            // Sphere — size proportional to critical fan-in
+            const cfi = entity._signals?.tier?.signals?.critical_fan_in || 3;
+            const radius = 1.5 + Math.log2(cfi + 1) * 0.6;
+            return new THREE.SphereGeometry(radius, 24, 24);
+        }
+
+        function createConduitGeometry(entity) {
+            // Octahedron — message hub, distinctive shape
+            const fi = entity._signals?.tier?.signals?.fan_in || 3;
+            const radius = 1.2 + Math.log2(fi + 1) * 0.4;
+            return new THREE.OctahedronGeometry(radius, 0);
+        }
+
+        function createMembraneGeometry(entity) {
+            // Thin wide disc / low cylinder — gateway boundary
+            return new THREE.CylinderGeometry(1.8, 2.0, 0.8, 16);
+        }
+
+        function createSubstrateGeometry(entity) {
+            // Flat wide box — platform
+            return new THREE.BoxGeometry(4, 0.6, 4);
+        }
+
+        function createSentinelGeometry(entity) {
+            // Tall narrow cylinder — spire/watchtower
+            const cfi = entity._signals?.tier?.signals?.critical_fan_in || 1;
+            const height = 5 + Math.log2(cfi + 1) * 2;
+            return new THREE.CylinderGeometry(0.5, 0.7, height, 8);
+        }
+
+        function createReactorGeometry(entity) {
+            // Hexagonal prism (CylinderGeometry with 6 segments)
+            const tier = entity.spec?.tier ?? 2;
+            const height = [5, 3.5, 2.5, 1.5][tier] || 2;
+            return new THREE.CylinderGeometry(1.1, 1.1, height, 6);
+        }
+
+        function createWorkerGeometry(entity) {
+            // Small box
+            const tier = entity.spec?.tier ?? 3;
+            const height = [3.5, 2.5, 1.8, 1.2][tier] || 1.2;
+            return new THREE.BoxGeometry(1.4, height, 1.4);
+        }
+
+        const GEOMETRY_FACTORY = {
+            NUCLEUS:   createNucleusGeometry,
+            CONDUIT:   createConduitGeometry,
+            MEMBRANE:  createMembraneGeometry,
+            SUBSTRATE: createSubstrateGeometry,
+            SENTINEL:  createSentinelGeometry,
+            REACTOR:   createReactorGeometry,
+            WORKER:    createWorkerGeometry,
+        };
+
+        function createEntityMesh(entity) {
+            const natureKey = getNatureKey(entity);
+            const config = NATURE_CONFIG[natureKey] || NATURE_CONFIG.WORKER;
+            const factory = GEOMETRY_FACTORY[natureKey] || createWorkerGeometry;
+            const geometry = factory(entity);
+
+            // Main material
+            const material = new THREE.MeshStandardMaterial({
+                color: config.color,
+                roughness: 0.35,
+                metalness: 0.65,
+                emissive: config.emissive,
+                emissiveIntensity: 0.3,
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            // Wireframe overlay for depth
+            const wireMat = new THREE.MeshBasicMaterial({
+                color: config.glow,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.12,
+            });
+            const wireMesh = new THREE.Mesh(geometry.clone(), wireMat);
+
+            // Group
+            const group = new THREE.Group();
+            group.add(mesh);
+            group.add(wireMesh);
+
+            // Glow ring for NUCLEUS
+            if (natureKey === 'NUCLEUS') {
+                const ringGeo = new THREE.TorusGeometry(
+                    geometry.parameters.radius + 0.5, 0.12, 8, 32
+                );
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: config.glow,
+                    transparent: true,
+                    opacity: 0.4,
+                });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = Math.PI / 2;
+                ring.name = 'glow-ring';
+                group.add(ring);
+            }
+
+            // Beacon for SENTINEL
+            if (natureKey === 'SENTINEL') {
+                const h = geometry.parameters.height || 5;
+                const beaconGeo = new THREE.SphereGeometry(0.35, 8, 8);
+                const beaconMat = new THREE.MeshStandardMaterial({
+                    color: config.glow,
+                    emissive: config.glow,
+                    emissiveIntensity: 1.5,
+                });
+                const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+                beacon.position.y = h / 2 + 0.4;
+                beacon.name = 'beacon';
+                group.add(beacon);
+            }
+
+            return { group, mainMesh: mesh, natureKey };
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // LAYOUT ENGINE
+        // ══════════════════════════════════════════════════════════════
+
+        function layoutDomain(domainId, entities, domainConf) {
+            const cx = domainConf.cx;
+            const cz = domainConf.cz;
+            const baseRadius = domainConf.radius;
+
+            // Separate by nature role
+            const nuclei = entities.filter(e => getNatureKey(e) === 'NUCLEUS');
+            const conduits = entities.filter(e => getNatureKey(e) === 'CONDUIT');
+            const membranes = entities.filter(e => getNatureKey(e) === 'MEMBRANE');
+            const substrates = entities.filter(e => getNatureKey(e) === 'SUBSTRATE');
+            const sentinels = entities.filter(e => getNatureKey(e) === 'SENTINEL');
+            const reactors = entities.filter(e => getNatureKey(e) === 'REACTOR');
+            const workers = entities.filter(e => getNatureKey(e) === 'WORKER');
+
+            const positions = new Map();
+
+            // Layer 0: Nuclei at center (stacked if multiple)
+            nuclei.forEach((e, i) => {
+                const angle = (i / Math.max(nuclei.length, 1)) * Math.PI * 2;
+                const r = nuclei.length > 1 ? 4 : 0;
+                positions.set(e.metadata.id, {
+                    x: cx + Math.cos(angle) * r,
+                    z: cz + Math.sin(angle) * r,
+                    y: 3 + i * 2,
+                });
+            });
+
+            // Layer 0.5: Conduits near center
+            conduits.forEach((e, i) => {
+                const angle = (i / Math.max(conduits.length, 1)) * Math.PI * 2 + 0.5;
+                positions.set(e.metadata.id, {
+                    x: cx + Math.cos(angle) * 5,
+                    z: cz + Math.sin(angle) * 5,
+                    y: 3,
+                });
+            });
+
+            // Layer 0.5: Sentinels close to center
+            sentinels.forEach((e, i) => {
+                const angle = (i / Math.max(sentinels.length, 1)) * Math.PI * 2 + 1.0;
+                positions.set(e.metadata.id, {
+                    x: cx + Math.cos(angle) * 6,
+                    z: cz + Math.sin(angle) * 6,
+                    y: 0,
+                });
+            });
+
+            // Layer 1: Reactors in inner orbit
+            const reactorRadius = baseRadius * 0.45;
+            reactors.forEach((e, i) => {
+                const angle = (i / Math.max(reactors.length, 1)) * Math.PI * 2;
+                const jitter = (Math.random() - 0.5) * 2;
+                positions.set(e.metadata.id, {
+                    x: cx + Math.cos(angle) * (reactorRadius + jitter),
+                    z: cz + Math.sin(angle) * (reactorRadius + jitter),
+                    y: 0,
+                });
+            });
+
+            // Layer 2: Workers in outer orbit
+            const workerRadius = baseRadius * 0.7;
+            workers.forEach((e, i) => {
+                const angle = (i / Math.max(workers.length, 1)) * Math.PI * 2;
+                const jitter = (Math.random() - 0.5) * 2;
+                positions.set(e.metadata.id, {
+                    x: cx + Math.cos(angle) * (workerRadius + jitter),
+                    z: cz + Math.sin(angle) * (workerRadius + jitter),
+                    y: 0,
+                });
+            });
+
+            // Layer 3: Membranes at perimeter
+            const membraneRadius = baseRadius * 0.92;
+            membranes.forEach((e, i) => {
+                const angle = (i / Math.max(membranes.length, 1)) * Math.PI * 2;
+                positions.set(e.metadata.id, {
+                    x: cx + Math.cos(angle) * membraneRadius,
+                    z: cz + Math.sin(angle) * membraneRadius,
+                    y: 0.4,
+                });
+            });
+
+            // Substrates as ground platforms
+            substrates.forEach((e, i) => {
+                const angle = (i / Math.max(substrates.length, 1)) * Math.PI * 2 + 2.5;
+                const r = baseRadius * 0.55;
+                positions.set(e.metadata.id, {
+                    x: cx + Math.cos(angle) * r,
+                    z: cz + Math.sin(angle) * r,
+                    y: 0.3,
+                });
+            });
+
+            return positions;
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // DOMAIN GROUND PLATES
+        // ══════════════════════════════════════════════════════════════
+
+        function createDomainPlate(domainId, conf) {
+            const r = conf.radius + 3;
+            const geo = new THREE.CircleGeometry(r, 48);
+            const mat = new THREE.MeshStandardMaterial({
+                color: conf.color,
+                roughness: 0.85,
+                metalness: 0.1,
+                transparent: true,
+                opacity: 0.5,
+            });
+            const plate = new THREE.Mesh(geo, mat);
+            plate.rotation.x = -Math.PI / 2;
+            plate.position.set(conf.cx, 0.02, conf.cz);
+            plate.receiveShadow = true;
+            domainGroup.add(plate);
+
+            // Domain border ring
+            const ringGeo = new THREE.TorusGeometry(r, 0.08, 8, 64);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: 0x334455,
+                transparent: true,
+                opacity: 0.4,
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.set(conf.cx, 0.05, conf.cz);
+            domainGroup.add(ring);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // LABEL SPRITES
+        // ══════════════════════════════════════════════════════════════
+
+        function createTextSprite(text, color, fontSize, opacity) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 64;
+
+            ctx.clearRect(0, 0, 512, 64);
+            ctx.font = `bold ${fontSize || 20}px monospace`;
+            ctx.fillStyle = color || '#00d4ff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Truncate long names
+            let display = text;
+            if (display.length > 28) display = display.substring(0, 26) + '…';
+            ctx.fillText(display, 256, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                opacity: opacity || 0.65,
+                depthTest: false,
+            });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(8, 1, 1);
+            return sprite;
+        }
+
+        function createDomainLabel(text, x, z, y) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 64;
+            ctx.clearRect(0, 0, 512, 64);
+            ctx.font = 'bold 28px monospace';
+            ctx.fillStyle = '#334466';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 256, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            const mat = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.5, depthTest: false });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(18, 2.25, 1);
+            sprite.position.set(x, y || 0.5, z);
+            labelsGroup.add(sprite);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // DEPENDENCY LINES
+        // ══════════════════════════════════════════════════════════════
+
+        function buildDependencyLines(entities) {
+            entities.forEach(entity => {
+                const sourceId = entity.metadata?.id;
+                const sourceData = entityDataMap.get(sourceId);
+                if (!sourceData) return;
+
+                const deps = entity.spec?.depends_on || [];
+                deps.forEach(dep => {
+                    const targetData = entityDataMap.get(dep.target);
+                    if (!targetData) return;
+
+                    const start = sourceData.position.clone();
+                    const end = targetData.position.clone();
+
+                    // Vertical offset for line starts/ends
+                    start.y += 1;
+                    end.y += 1;
+
+                    // Arc
+                    const mid = new THREE.Vector3().lerpVectors(start, end, 0.5);
+                    const dist = start.distanceTo(end);
+                    mid.y += 3 + dist * 0.08;
+
+                    const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+                    const points = curve.getPoints(24);
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+                    const isCritical = dep.critical;
+                    const lineColor = isCritical ? 0xff4444 : 0x223344;
+                    const material = new THREE.LineBasicMaterial({
+                        color: lineColor,
+                        transparent: true,
+                        opacity: isCritical ? 0.45 : 0.15,
+                    });
+                    const line = new THREE.Line(geometry, material);
+                    linesGroup.add(line);
+                });
+            });
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // CITY BUILDER
+        // ══════════════════════════════════════════════════════════════
+
+        function buildCity(allEntities) {
+            // Group entities by domain
+            const byDomain = {};
+            allEntities.forEach(e => {
+                const d = e.metadata?.domain || 'standalone';
+                if (!byDomain[d]) byDomain[d] = [];
+                byDomain[d].push(e);
+            });
+
+            // Create domain plates and labels
+            Object.entries(DOMAIN_CONFIG).forEach(([domainId, conf]) => {
+                if (byDomain[domainId]) {
+                    createDomainPlate(domainId, conf);
+                    createDomainLabel(conf.label, conf.cx, conf.cz - conf.radius - 3, 0.5);
+                }
+            });
+
+            // Layout each domain
+            const allPositions = new Map();
+            Object.entries(byDomain).forEach(([domainId, entities]) => {
+                const conf = DOMAIN_CONFIG[domainId] || DOMAIN_CONFIG.standalone;
+                const positions = layoutDomain(domainId, entities, conf);
+                positions.forEach((pos, id) => allPositions.set(id, pos));
+            });
+
+            // Place entities
+            allEntities.forEach(entity => {
+                const id = entity.metadata?.id;
+                const pos = allPositions.get(id);
+                if (!pos) return;
+
+                const { group, mainMesh, natureKey } = createEntityMesh(entity);
+
+                // Compute mesh height for correct Y placement
+                const geo = mainMesh.geometry;
+                geo.computeBoundingBox();
+                const meshHeight = geo.boundingBox.max.y - geo.boundingBox.min.y;
+                const yOffset = meshHeight / 2;
+
+                group.position.set(pos.x, pos.y + yOffset, pos.z);
+                buildingsGroup.add(group);
+
+                // Register for raycasting
+                mainMesh.userData = { entityId: id, entity, natureKey };
+                entityMeshes.push(mainMesh);
+
+                const worldPos = new THREE.Vector3(pos.x, pos.y + yOffset, pos.z);
+                entityDataMap.set(id, {
+                    entity, group, mainMesh, natureKey,
+                    position: worldPos,
+                });
+
+                // Floating label
+                const nc = NATURE_CONFIG[natureKey] || NATURE_CONFIG.WORKER;
+                const labelColor = '#' + nc.color.toString(16).padStart(6, '0');
+                const label = createTextSprite(id, labelColor, 18, 0.55);
+                label.position.set(pos.x, pos.y + meshHeight + 1.5, pos.z);
+                labelsGroup.add(label);
+            });
+
+            buildDependencyLines(allEntities);
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // STATS & LEGEND
+        // ══════════════════════════════════════════════════════════════
+
+        function updateStats(entities) {
+            const byNature = {}, byDomain = {};
+            entities.forEach(e => {
+                const nk = getNatureKey(e);
+                byNature[nk] = (byNature[nk] || 0) + 1;
+                const d = e.metadata?.domain || 'unknown';
+                byDomain[d] = (byDomain[d] || 0) + 1;
+            });
+
+            let html = `<div class="stat-row"><span class="stat-label">Total Entities</span><span class="stat-value">${entities.length}</span></div>`;
+
+            html += `<div class="stat-section"><div class="stat-section-title">By Nature</div>`;
+            const natureOrder = ['NUCLEUS','CONDUIT','MEMBRANE','SENTINEL','REACTOR','WORKER','SUBSTRATE'];
+            natureOrder.forEach(n => {
+                if (byNature[n]) {
+                    const c = NATURE_CONFIG[n];
+                    html += `<div class="stat-row"><span class="stat-label" style="color:#${c.color.toString(16).padStart(6,'0')}">${c.label}</span><span class="stat-value">${byNature[n]}</span></div>`;
+                }
+            });
+            html += `</div>`;
+
+            html += `<div class="stat-section"><div class="stat-section-title">By Domain</div>`;
+            Object.entries(byDomain).sort((a,b) => b[1]-a[1]).forEach(([d, v]) => {
+                html += `<div class="stat-row"><span class="stat-label">${d}</span><span class="stat-value">${v}</span></div>`;
+            });
+            html += `</div>`;
+
+            document.getElementById('stats-content').innerHTML = html;
+        }
+
+        function buildLegend() {
+            const natureEl = document.getElementById('nature-legend');
+            const order = ['NUCLEUS','CONDUIT','MEMBRANE','SENTINEL','REACTOR','WORKER','SUBSTRATE'];
+            const shapes = {
+                NUCLEUS:  '●', CONDUIT: '◆', MEMBRANE: '◎',
+                SENTINEL: '▮', REACTOR: '⬡', WORKER: '■', SUBSTRATE: '▬',
+            };
+            order.forEach(n => {
+                const c = NATURE_CONFIG[n];
+                const hex = '#' + c.color.toString(16).padStart(6, '0');
+                natureEl.innerHTML += `<div class="legend-item"><span style="color:${hex};font-size:16px;">${shapes[n]}</span> <span>${c.label}</span> <span style="color:#556;font-size:10px;">— ${c.desc}</span></div>`;
+            });
+
+            const domainEl = document.getElementById('domain-legend');
+            Object.entries(DOMAIN_CONFIG).forEach(([id, conf]) => {
+                const hex = '#' + conf.color.toString(16).padStart(6, '0');
+                domainEl.innerHTML += `<div class="legend-item"><div style="width:12px;height:12px;border-radius:50%;background:${hex};border:1px solid #445;flex-shrink:0;"></div> <span>${conf.label}</span></div>`;
+            });
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // HOVER / TOOLTIP
+        // ══════════════════════════════════════════════════════════════
+
+        const tooltip = document.getElementById('tooltip');
+
+        renderer.domElement.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(entityMeshes, false);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0].object;
+                const data = hit.userData;
+                if (data && data.entityId) {
+                    const entity = data.entity;
+                    const spec = entity.spec || {};
+                    const meta = entity.metadata || {};
+                    const natureKey = data.natureKey;
+                    const nc = NATURE_CONFIG[natureKey] || NATURE_CONFIG.WORKER;
+                    const hex = '#' + nc.color.toString(16).padStart(6, '0');
+
+                    const deps = (spec.depends_on || []).map(d => {
+                        const prefix = d.critical ? '⚡' : '→';
+                        return `${prefix} ${d.target}`;
+                    }).join('<br>') || 'none';
+
+                    const signals = entity._signals?.tier?.signals || {};
+
+                    tooltip.innerHTML = `
+                        <div class="tip-id">${meta.id}</div>
+                        <div class="tip-nature" style="background:${hex}22;color:${hex};border:1px solid ${hex}44;">${nc.label}${spec.sub_nature ? ' · ' + spec.sub_nature : ''}</div>
+                        <div class="tip-detail">${spec.type} · tier-${spec.tier ?? '?'} · ${spec.lifecycle || '?'}</div>
+                        <div class="tip-detail">Domain: ${meta.domain} · Team: ${meta.team || '?'}</div>
+                        <div class="tip-detail">FI: ${signals.fan_in ?? 0} · CFI: ${signals.critical_fan_in ?? 0} · Blast: ${signals.blast_radius ?? 0}</div>
+                        ${meta.description ? `<div class="tip-desc">${meta.description}</div>` : ''}
+                        <div class="tip-detail" style="margin-top:6px;color:#556;">Dependencies:<br>${deps}</div>
+                    `;
+                    tooltip.style.display = 'block';
+
+                    // Position tooltip, keep on screen
+                    let tx = e.clientX + 15;
+                    let ty = e.clientY + 15;
+                    if (tx + 360 > window.innerWidth) tx = e.clientX - 375;
+                    if (ty + 200 > window.innerHeight) ty = e.clientY - 210;
+                    tooltip.style.left = tx + 'px';
+                    tooltip.style.top = ty + 'px';
+
+                    // Highlight
+                    if (hoveredMesh && hoveredMesh !== hit) {
+                        hoveredMesh.material.emissiveIntensity = 0.3;
+                    }
+                    hoveredMesh = hit;
+                    hit.material.emissiveIntensity = 0.8;
+                }
+            } else {
+                if (hoveredMesh) {
+                    hoveredMesh.material.emissiveIntensity = 0.3;
+                    hoveredMesh = null;
+                }
+                tooltip.style.display = 'none';
+            }
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        // EVENT BRIDGE (preserved from v1)
+        // ══════════════════════════════════════════════════════════════
+
+        const TAXONOMY = {
+            crash_loop:       { color: '#FF2200', persist: true },
+            unhealthy:        { color: '#FFAA00', persist: true },
+            high_latency:     { color: '#FF6600', persist: true },
+            error_spike:      { color: '#FF0000', persist: true },
+            oom_killed:       { color: '#FF4400', persist: false, duration: 5000 },
+            pod_evicted:      { color: '#FF8800', persist: false, duration: 5000 },
+            scaled_up:        { color: '#44AAFF', persist: false, duration: 3000 },
+            scaled_down:      { color: '#8888FF', persist: false, duration: 3000 },
+            rolling_update:   { color: '#AAAAFF', persist: true },
+            restored:         { color: '#00FF88', persist: false, duration: 5000 },
+            lifecycle_change: { color: '#FFFFFF', persist: false, duration: 3000 },
+        };
+        const SEV_COLORS = { info: '#888', warning: '#ffaa00', critical: '#ff2200' };
+
+        const buildingAlerts = new Map();
+        let eventTotal = 0;
+
+        function applyEventVisual(entityId, eventType, severity) {
+            const data = entityDataMap.get(entityId);
+            if (!data) return;
+            const spec = TAXONOMY[eventType] || { color: '#ffffff', persist: false, duration: 2000 };
+            const color = new THREE.Color(spec.color);
+
+            const existing = buildingAlerts.get(entityId);
+            if (existing) {
+                data.group.remove(existing.overlayMesh);
+                if (existing.timeout) clearTimeout(existing.timeout);
+            }
+
+            const geo = new THREE.SphereGeometry(1.6, 12, 12);
+            const mat = new THREE.MeshStandardMaterial({
+                color, emissive: color, emissiveIntensity: 1.5,
+                transparent: true, opacity: 0.5,
+            });
+            const overlayMesh = new THREE.Mesh(geo, mat);
+            overlayMesh.position.set(0, 2, 0);
+            data.group.add(overlayMesh);
+
+            const alert = { overlayMesh, timeout: null, eventType };
+            buildingAlerts.set(entityId, alert);
+
+            if (!spec.persist) {
+                alert.timeout = setTimeout(() => {
+                    data.group.remove(overlayMesh);
+                    buildingAlerts.delete(entityId);
+                }, spec.duration || 3000);
+            }
+        }
+
+        function clearEventVisual(entityId) {
+            const data = entityDataMap.get(entityId);
+            if (!data) return;
+            const alert = buildingAlerts.get(entityId);
+            if (alert) {
+                data.group.remove(alert.overlayMesh);
+                if (alert.timeout) clearTimeout(alert.timeout);
+                buildingAlerts.delete(entityId);
+            }
+        }
+
+        const eventListEl = document.getElementById('event-list');
+        const eventCountEl = document.getElementById('event-count');
+        const MAX_FEED = 7;
+        const feedDivs = [];
+
+        function addToFeed(entityId, eventType, severity) {
+            eventTotal++;
+            eventCountEl.textContent = eventTotal;
+            const dot = SEV_COLORS[severity] || '#888';
+            const label = eventType.replace(/_/g, ' ');
+            const div = document.createElement('div');
+            div.className = 'event-item';
+            div.innerHTML =
+                `<div class="event-dot" style="background:${dot}"></div>` +
+                `<span class="event-entity">${entityId}</span>` +
+                `<span class="event-label">${label}</span>`;
+            feedDivs.unshift(div);
+            if (feedDivs.length > MAX_FEED) eventListEl.removeChild(feedDivs.pop());
+            eventListEl.insertBefore(div, eventListEl.firstChild);
+        }
+
+        function startEventBridge(url) {
+            const statusEl = document.getElementById('bridge-status');
+            statusEl.style.display = 'block';
+            let reconnectMs = 2000;
+            function connect() {
+                statusEl.textContent = '⬤ Connecting to Event Bridge…';
+                statusEl.className = 'st-connecting';
+                const ws = new WebSocket(url);
+                ws.onopen = () => { statusEl.textContent = '⬤ Event Bridge Connected'; statusEl.className = 'st-connected'; reconnectMs = 2000; };
+                ws.onmessage = (e) => {
+                    let msg; try { msg = JSON.parse(e.data); } catch { return; }
+                    if (msg.type === 'entity_event' || msg.type === 'lifecycle_transition') {
+                        applyEventVisual(msg.entity_id, msg.event, msg.severity);
+                        addToFeed(msg.entity_id, msg.event, msg.severity);
+                        if (msg.event === 'restored') setTimeout(() => clearEventVisual(msg.entity_id), 5000);
+                    }
+                };
+                ws.onclose = () => {
+                    statusEl.textContent = '⬤ Disconnected — reconnecting…';
+                    statusEl.className = 'st-disconnected';
+                    reconnectMs = Math.min(reconnectMs * 1.5, 30000);
+                    setTimeout(connect, reconnectMs);
+                };
+                ws.onerror = () => ws.close();
+            }
+            connect();
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // ANIMATION LOOP
+        // ══════════════════════════════════════════════════════════════
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+
+            // Animate NUCLEUS glow rings
+            entityDataMap.forEach((data) => {
+                if (data.natureKey === 'NUCLEUS') {
+                    const ring = data.group.getObjectByName('glow-ring');
+                    if (ring) {
+                        ring.material.opacity = 0.2 + Math.sin(elapsed * 1.5) * 0.15;
+                        ring.rotation.z = elapsed * 0.3;
+                    }
+                }
+                if (data.natureKey === 'SENTINEL') {
+                    const beacon = data.group.getObjectByName('beacon');
+                    if (beacon) {
+                        beacon.material.emissiveIntensity = 1.0 + Math.sin(elapsed * 3) * 0.5;
+                    }
+                }
+            });
+
+            // Animate alert overlays
+            buildingAlerts.forEach((alert) => {
+                if (!alert.overlayMesh) return;
+                const spec = TAXONOMY[alert.eventType] || {};
+                if (spec.persist) {
+                    alert.overlayMesh.material.opacity = 0.3 + Math.abs(Math.sin(elapsed * 3.5)) * 0.3;
+                    alert.overlayMesh.material.emissiveIntensity = 0.8 + Math.abs(Math.sin(elapsed * 2.5)) * 0.8;
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // ── Resize ──
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ── Load & Start ──
+        buildLegend();
+
+        fetch('../ontology.json')
+            .then(r => r.json())
+            .then(data => {
+                const entities = Object.values(data.entities || {});
+                buildCity(entities);
+                updateStats(entities);
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(err => {
+                console.error('Failed to load ontology.json:', err);
+                document.getElementById('loading').innerHTML =
+                    '<p style="color:#ff4444;">Failed to load ontology.json<br><small>' + err.message + '</small></p>';
+            });
+
+        animate();
+        startEventBridge('ws://localhost:8765/ws');
+    })();
+    </script>
+</body>
+</html>

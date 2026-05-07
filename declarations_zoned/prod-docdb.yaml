@@ -1,0 +1,18 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: prod-docdb
+  name: DocumentDB prod-docdb
+  domain: wincore-mssql
+  team: platform-infra
+  description: DocumentDB 'prod-docdb'
+spec:
+  type: datastore
+  tier: 0
+  lifecycle: active
+  protocols:
+  - name: mongodb
+    port: 27017
+    description: MongoDB wire protocol
+  depends_on: []
+  nature: NUCLEUS

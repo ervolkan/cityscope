@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: prod-sport-asset
+  name: S3 prod_sport-asset
+  domain: infrastructure
+  team: platform-infra
+  description: S3 'prod_sport-asset'
+spec:
+  type: storage
+  tier: 3
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: SUBSTRATE

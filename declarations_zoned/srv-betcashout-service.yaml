@@ -1,0 +1,72 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: srv-betcashout-service
+  name: Prod Srv Betcashout Service
+  domain: wincore-mssql
+  team: wincore-backend
+  description: Auto-bootstrapped from srv-betcashout-service-values.yaml
+  labels:
+    orleans: 'true'
+    service_type: ClusterIP
+spec:
+  type: service
+  tier: 2
+  lifecycle: active
+  protocols:
+  - name: orleans
+    port: 11111
+    description: orleans-silo
+  - name: orleans
+    port: 30000
+    description: orleans-gw
+  - name: grpc
+    port: 8080
+    description: grpc
+  - name: http
+    port: 80
+    description: api
+  - name: grpc
+    port: 8181
+    description: grpc-alt
+  depends_on:
+  - target: mssql-10-2-152-240
+    type: storage
+    protocol: mssql
+    critical: true
+    description: MSSQL 'NSWT.Context' via NSWT__Identity__Authorization__ConnectionString
+  - target: prod-docdb
+    type: storage
+    protocol: mongodb
+    critical: true
+    description: DocumentDB via NSWT__Orleans__MongoStorage__ConnectionString
+  - target: srv-cashout-grpc
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__CashoutGrpcHost
+  - target: srv-betdatahub-service
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__BetDataHubGrpcGateWayHost
+  - target: srv-cashout-provider-service
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__CashoutProviderGrpcHost
+  - target: rabbitmq-10-2-160-192
+    type: async
+    protocol: amqp
+    critical: false
+    description: RabbitMQ via NSWT__Orleans__RabbitMq__HostName
+  - target: srv-customer-grpc
+    type: sync
+    protocol: http
+    critical: true
+    description: 'initContainer: prod-srv-customer-grpc'
+  image: cashout.grpc.service:cc07a05
+  scaling:
+    current_replicas: 1
+  nature: PROCESSOR
+  sub_nature: REACTOR

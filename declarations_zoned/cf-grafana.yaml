@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: cf-grafana
+  name: Cloudflare grafana.${var.domain}
+  domain: infrastructure
+  team: platform-infra
+  description: 'DNS record: grafana.${var.domain}'
+spec:
+  type: gateway
+  tier: 1
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: MEMBRANE

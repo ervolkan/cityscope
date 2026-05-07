@@ -1,4 +1,5 @@
-"""CityScope Bootstrap + Zoning Integration
+"""
+CityScope Bootstrap + Zoning Integration
 ==========================================
 Runs the full pipeline:
   1. bootstrap_real.py → raw entities + edges (Pass 1: signal extraction)
@@ -125,7 +126,6 @@ def run_pipeline(infra_path: str | None, cd_path: str | None, output_path: str):
     tier_dist: dict[int, int] = {}
     domain_dist: dict[str, int] = {}
     type_dist: dict[str, int] = {}
-    nature_dist: dict[str, int] = {}
     absorbed = 0
 
     for eid, e in all_entities.items():
@@ -136,17 +136,10 @@ def run_pipeline(infra_path: str | None, cd_path: str | None, output_path: str):
         domain_dist[d] = domain_dist.get(d, 0) + 1
         type_dist[tp] = type_dist.get(tp, 0) + 1
 
-        # Nature distribution (nature + sub_nature)
-        nature = e["spec"].get("nature", "UNKNOWN")
-        sub = e["spec"].get("sub_nature", "")
-        nature_key = f"{nature}/{sub}" if sub else nature
-        nature_dist[nature_key] = nature_dist.get(nature_key, 0) + 1
-
     print(f"\n  After zoning: {len(all_entities)} entities")
     print(f"  Tier distribution: { {f'T{k}': v for k, v in sorted(tier_dist.items())} }")
     print(f"  Type distribution: {dict(sorted(type_dist.items()))}")
     print(f"  Domain distribution: {dict(sorted(domain_dist.items()))}")
-    print(f"  Nature distribution: {dict(sorted(nature_dist.items()))}")
 
     # ── Step 4: Output ──
     print(f"\n[4/4] Writing output...")
@@ -169,14 +162,6 @@ def run_pipeline(infra_path: str | None, cd_path: str | None, output_path: str):
     out.write_text(json.dumps(ontology, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"  Ontology written to: {out}")
     print(f"  Total entities: {len(all_entities)}")
-
-    # Print nature sample for verification
-    print(f"\n  Nature assignments (sample):")
-    for eid, e in sorted(all_entities.items(), key=lambda x: x[1]["spec"].get("nature", ""))[:10]:
-        n = e["spec"].get("nature", "?")
-        sn = e["spec"].get("sub_nature", "")
-        label = f"{n}/{sn}" if sn else n
-        print(f"    {eid:40s} → {label}")
 
     # Write individual declarations (without _signals for clean YAML)
     import yaml

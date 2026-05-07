@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: monitoring-alb
+  name: ALB monitoring_alb
+  domain: infrastructure
+  team: platform-infra
+  description: Application Load Balancer
+spec:
+  type: gateway
+  tier: 1
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: MEMBRANE

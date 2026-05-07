@@ -1,110 +1,119 @@
-# CityScope Session Handoff — 2025-05-07 (Session 2)
+# CityScope Session Handoff — 2025-05-07 (Session 3)
 
 ## What we built this session
 
-### 1. Nature Classification (`classify_nature()` in engine.py)
-Implements ENTITY-ONTOLOGY.md §3 derivation rules in code:
-- N-01: NUCLEUS — datastore/cache with critical_fan_in >= 3
-- N-02: CONDUIT — messagebus with fan_in >= 3
-- N-03: MEMBRANE — external gateway (receives_external_traffic + type=gateway)
-- N-04: SUBSTRATE — network/compute/storage infrastructure
-- N-05c: SENTINEL — service with CFI >= 5 + narrow protocol surface (≤ 2 protocols)
-- N-05a: REACTOR — service with fan_in >= 1 AND fan_out >= 3
-- N-05b: WORKER — everything else (default processor)
+### 1. Nature-Based Renderer (renderer/index.html — full rewrite)
+Replaced flat grid BoxGeometry layout with nature-aware 3D city:
 
-Each entity gets `spec.nature`, `spec.sub_nature` (for processors), and
-`_signals.nature` audit trail with the rule that fired and input signals.
+**Geometry per nature:**
+- NUCLEUS → SphereGeometry, radius ∝ log₂(CFI) — MSSQL (CFI=28) is the biggest sphere
+- CONDUIT → OctahedronGeometry, radius ∝ log₂(FI) — RabbitMQ diamond
+- MEMBRANE → CylinderGeometry(1.8, 2.0, 0.8, 16) — thin disc for ALB/Cloudflare
+- SUBSTRATE → BoxGeometry(4, 0.6, 4) — flat platform for VPC/EKS/S3
+- SENTINEL → CylinderGeometry(0.5, 0.7, h, 8) — tall narrow spire, h ∝ log₂(CFI)
+- REACTOR → CylinderGeometry(1.1, 1.1, h, 6) — hexagonal prism, height by tier
+- WORKER → BoxGeometry(1.4, h, 1.4) — small box, height by tier
 
-### 2. Domain Semantic Naming (`name_domains()` in engine.py)
-Replaces generic `domain-001`, `domain-002` with meaningful names derived from:
-- Dominant storage target technology (mssql, postgres, docdb, etc.)
-- Protocol stack hints (orleans/mssql → wincore, grpc+http+postgres → nexus)
-- Result: `wincore-mssql`, `app-postgres`, `infrastructure`, `standalone`
+**Domain cluster layout:**
+- 4 domains = 4 neighborhoods (circular ground plates with border rings)
+- standalone (cx:0, cz:0), wincore-mssql (cx:-38, cz:20), app-postgres (cx:38, cz:20), infrastructure (cx:0, cz:-35)
+- Concentric orbital placement within each domain:
+  - Nucleus → center
+  - Conduit/Sentinel → near center (r=5-6)
+  - Reactor → inner orbit (radius × 0.45)
+  - Worker → outer orbit (radius × 0.7)
+  - Membrane → perimeter (radius × 0.92)
+  - Substrate → ground level
 
-### 3. Signal Extraction Fixes (extract_signals)
-- Added label-based signal reading (external_traffic, service_type, nodePort)
-- Added `_enrichment_signals` propagation (receives_external_traffic, is_alb_target)
-- Added `iac_resource_type` reading from spec
-- Added structural inference: gateway entities inherently receive external traffic
+**Visual enhancements:**
+- NUCLEUS: animated glow ring (TorusGeometry, pulsing opacity + rotation)
+- SENTINEL: beacon sphere on top (pulsing emissive)
+- Wireframe overlay on all entities
+- Nature-colored labels per entity
+- Tooltip shows nature badge, FI/CFI/Blast radius, dependency list with ⚡/→ markers
+- Legend: nature shapes + domain ground colors
+- Stats panel: by nature + by domain breakdown
 
-### 4. Entity Boundary Fix
-- VPC and other foundation network entities (vpc, subnet, vnet patterns) are
-  now protected from absorption. Only leaf network entities (security groups,
-  NACLs, firewall rules) get absorbed.
+**Preserved from v1:** Event bridge WebSocket, alert overlays, TAXONOMY, live event feed
 
-### 5. Type Classification Fix
-- Gateway type promotion now only confirms entities already bootstrapped as
-  gateway (from IaC resource type). Services receiving ALB traffic remain
-  services — they are ALB targets, not gateways.
+### 2. Gravitational Pull — Domain Assignment Fix (engine.py)
+Added a gravitational pull phase to `classify_domains()` that pulls standalone
+entities into their natural domain based on dependency topology:
+
+**Problem:** Datastores (MSSQL, PostgreSQL, DocumentDB) and orphan services
+(srv-cashout-grpc, srv-cashout-provider-service) ended up in `standalone`
+because they have no `storage_targets` of their own, so union-find couldn't
+cluster them with their dependents.
+
+**Solution:** After initial domain assignment, iterate over standalone entities
+and collect "domain votes" from two directions:
+- **Reverse:** who depends on me? (critical deps = 2 votes, normal = 1 vote)
+- **Forward:** who do I depend on? (1 vote per target)
+If one domain has >50% of votes, pull the entity there.
+
+**Key design decisions:**
+- Datastore/cache: only count critical dependents (strong gravity — data is critical)
+- Messagebus: count all dependents (async = weaker but still gravity)
+- Services: count all dependents + forward deps
+- Iterative (3 passes): first pass pulls datastores, second pass pulls orphan services
+  that now have forward deps into the newly-pulled datastore's domain (domino effect)
+
+**Result:**
+- mssql-10-2-152-240 (CFI=28) → wincore-mssql (was standalone)
+- postgres-10-2-159-193 (CFI=14) → app-postgres (was standalone)
+- prod-docdb (CFI=8) → wincore-mssql (was standalone)
+- mssql-10-2-133-4 (CFI=2) → wincore-mssql (was standalone)
+- srv-cashout-grpc → wincore-mssql (was standalone, 1 dependent in wincore)
+- srv-cashout-provider-service → wincore-mssql (was standalone, 3 dependents in wincore)
+- rabbitmq, stage, srv-betdatasource-grpc → remain standalone (no dominant pull)
 
 ## Current state of the ontology
 
 ```
 69 entities after zoning:
-  Tier 0: 5   (MSSQL CFI=28, PostgreSQL CFI=14, DocumentDB CFI=8,
-                identity-service CFI=13, prod-alb FI=9)
-  Tier 1: 35  (external-facing services, Cloudflare entries, RabbitMQ, log-mgmt)
-  Tier 2: 9   (internal services with some dependents)
-  Tier 3: 20  (Nexus internal services, infra, standalone)
 
-  Types:
-    service: 46, gateway: 13, datastore: 5, storage: 2,
-    compute: 1, messagebus: 1, network: 1
-
-  Domains:
-    wincore-mssql (29): WinCore stack — MSSQL-anchored Orleans/.NET services
-    app-postgres (14):  Nexus stack — PostgreSQL-anchored gRPC/HTTP services
-    infrastructure (17): VPC, EKS, ALBs, Cloudflare, S3
-    standalone (9):      cross-domain datastores, orphan services
+  Domains (post-gravitational-pull):
+    wincore-mssql: ~34  (was 29 — gained MSSQL, DocDB, secondary MSSQL, 2 cashout services)
+    infrastructure: 17  (unchanged)
+    app-postgres:  ~15  (was 14 — gained PostgreSQL)
+    standalone:    ~3   (rabbitmq, stage, betdatasource-grpc)
 
   Natures:
-    NUCLEUS: 3          (MSSQL, PostgreSQL, DocumentDB)
+    NUCLEUS: 3          (MSSQL, PostgreSQL, DocumentDB — now inside their domains)
     CONDUIT: 1          (RabbitMQ)
     MEMBRANE: 13        (ALBs + Cloudflare DNS entries)
     PROCESSOR/SENTINEL: 1 (identity-service)
-    PROCESSOR/REACTOR: 21 (WinCore services with fan-in + fan-out >= 3)
-    PROCESSOR/WORKER: 26  (Nexus internal + low-connectivity services)
+    PROCESSOR/REACTOR: 21
+    PROCESSOR/WORKER: ~26
     SUBSTRATE: 4         (VPC, EKS, S3 x2)
 ```
 
 ## Key discoveries this session
 
-1. **Gateway vs service distinction is critical**: Services receiving ALB traffic
-   are NOT gateways. Gateways are IaC-defined boundary infrastructure (ALB, CDN).
-   Services behind them are "ALB targets" — still processors.
+1. **Datastores must be inside their dependent domain, not standalone**: The
+   "city metaphor" breaks when the database sits outside the neighborhood it
+   serves. Gravitational pull fixes this by using dependency topology as mass.
 
-2. **Foundation network entities must be protected**: VPC was being absorbed by
-   the same rule that removes orphan security groups. Foundation detection
-   (pattern-based: vpc/subnet/vnet) prevents this.
+2. **Iterative pull enables cascading**: Pulling MSSQL into wincore-mssql in
+   pass 1 creates forward-dep votes for srv-cashout-grpc in pass 2. Without
+   iteration, orphan services with only forward deps stay stranded.
 
-3. **Nature derivation validates structural signals**: identity-service correctly
-   classified as SENTINEL (CFI=13, 2 protocols) purely from graph topology.
-   Nexus services correctly classified as WORKER (FI=0, internal). No name
-   matching needed anywhere.
+3. **Nature-based geometry makes city instantly readable**: You can see at a
+   glance which entities are critical (big red spheres), which are boundary
+   (green discs at perimeter), which are workhorses (purple hexagons in orbit).
+   The old BoxGeometry grid conveyed none of this.
 
-4. **mssql-10-2-133-4 (CFI=2) is NOT a nucleus**: The secondary MSSQL instance
-   has low critical fan-in. The engine correctly keeps it below the NUCLEUS
-   threshold (CFI >= 3). It will be PROCESSOR/WORKER until more services
-   critically depend on it.
+4. **Domain plates create spatial memory**: The circular ground plates establish
+   neighborhoods. Once you know "wincore is southwest, nexus is east", you
+   develop spatial intuition — same as navigating a real city.
 
 ## What to do next session
 
-### Priority 1: Renderer update with nature-based geometry
-Update `renderer/index.html` to use nature-specific shapes:
-- NUCLEUS = SphereGeometry, size ∝ CFI
-- CONDUIT = TubeGeometry spanning connected clusters
-- MEMBRANE = arc/dome at domain perimeter
-- SENTINEL = tall narrow CylinderGeometry (spire)
-- REACTOR = hexagonal prism, height = tier
-- WORKER = small BoxGeometry
-- SUBSTRATE = ground plane / platform
-
-Layout rules:
-- Nucleus at domain center
-- Processors orbit their nucleus (distance ∝ 1/dependency_criticality)
-- Membranes at outer ring
-- Substrate as ground plane
-- Tier as Y-axis elevation
+### Priority 1: Namespace extraction (separate PR)
+- Parse ArgoCD/Flux Application manifests for `spec.destination.namespace`
+- Or heuristic: nexus-* → nexus ns, bo-*/srv-*/identity-* → wincore ns
+- Add `metadata.namespace` to entity declarations
+- Use as validation signal for domain assignment
 
 ### Priority 2: Infra chain completion
 - EKS managed node group parsing (nested block regex)
@@ -116,28 +125,29 @@ Layout rules:
 - OTel/Prometheus signal mapping to visual properties
 - WebSocket infrastructure for live updates
 
-## File locations
+### Priority 4: Renderer refinements
+- Domain plate overlap fix (adjust DOMAIN_CONFIG coordinates based on entity count)
+- Dependency line filtering (show/hide by type, critical-only toggle)
+- Camera presets (fly to domain, fly to entity)
+- Click-to-select with dependency highlighting
+
+## File changes this session
 
 ```
-P:\Work\CityScope\cityscope-repo\
-  bootstrap_real.py              — Bootstrap pipeline (Pass 1)
-  run_pipeline.py                — Full pipeline orchestrator
-  src/zoning/
-    __init__.py
-    engine.py                    — Zoning engine + nature classification
-    enrichment.py                — Graph enrichment (edge discovery)
-  docs/
-    ZONING-CODE.md               — Platform-agnostic classification rules
-    ENTITY-ONTOLOGY.md           — Five natures, forms, spatial layout
-  ontology.json                  — Current real ontology (69 entities)
-  declarations_zoned/            — Individual YAML per entity (post-zoning)
-  renderer/index.html            — Three.js renderer (still uses old BoxGeometry)
+Modified:
+  src/zoning/engine.py           — Gravitational pull in classify_domains()
+  renderer/index.html            — Full rewrite: nature geometry + domain layout
 
-P:\Work\CityScope\infra\          — Cloned BetCoreWin/infra repo
-P:\Work\CityScope\betcorewin-cd\  — Cloned BetCoreWin/betcorewin-cd repo
+Unchanged:
+  bootstrap_real.py
+  run_pipeline.py
+  src/zoning/enrichment.py
+  docs/ZONING-CODE.md
+  docs/ENTITY-ONTOLOGY.md
 ```
 
 ## Commits
 - `fcd2ea3` — feat: real bootstrap pipeline + zoning engine + graph enrichment
 - `9971b48` — docs: entity ontology - five natures, forms, and spatial layout principles
-- (pending) — feat: nature classification + domain semantic naming + signal extraction fixes
+- (PR #10) — feat: nature classification + domain semantic naming + signal extraction fixes
+- (this session) — feat: nature-based renderer + gravitational pull domain assignment

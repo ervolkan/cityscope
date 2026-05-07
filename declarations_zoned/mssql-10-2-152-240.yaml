@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: mssql-10-2-152-240
+  name: MSSQL mssql-10-2-152-240
+  domain: wincore-mssql
+  team: platform
+  description: MSSQL server (implicit)
+spec:
+  type: datastore
+  tier: 0
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: NUCLEUS

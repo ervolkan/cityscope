@@ -1,0 +1,2991 @@
+{
+  "apiVersion": "cityscope.dev/v1",
+  "kind": "Ontology",
+  "metadata": {
+    "name": "cityscope-ontology",
+    "entity_count": 65
+  },
+  "entities": {
+    "nexus-admin": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-admin",
+        "name": "Nexus Admin Service",
+        "domain": "nexus-backoffice",
+        "team": "nexus-backend",
+        "description": "Admin panel backend: user management, configuration, and operational tools"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-admin",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Admin config store"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-admin:latest",
+        "scaling": {
+          "min_replicas": 1,
+          "max_replicas": 3,
+          "current_replicas": 1,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-ai-recommender": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-ai-recommender",
+        "name": "Nexus AI Recommender",
+        "domain": "nexus-ai",
+        "team": "nexus-data",
+        "description": "AI-powered personalized recommendations for customers"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-recommendations",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Recommendation model store"
+          },
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Event-driven model updates"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.5,
+          "latency_p99_ms": 2000,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-ai-recommender:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 8,
+          "current_replicas": 2,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-alb": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-alb",
+        "name": "Nexus Application Load Balancer",
+        "domain": "nexus-gateway",
+        "team": "nexus-sre",
+        "description": "AWS ALB for internal traffic distribution across services"
+      },
+      "spec": {
+        "type": "gateway",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "https",
+            "port": 443,
+            "description": "HTTPS load balancing"
+          },
+          {
+            "name": "http",
+            "port": 80,
+            "description": "HTTP redirect"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-api",
+            "type": "sync",
+            "protocol": "http",
+            "timeout_ms": 2000,
+            "critical": true,
+            "description": "Primary API routing"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 100,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-alert-manager": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-alert-manager",
+        "name": "Nexus Alert Manager",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "Alert routing and notification management"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "http",
+            "port": 9093,
+            "description": "Alertmanager HTTP API"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-prometheus",
+            "type": "sync",
+            "protocol": "http",
+            "timeout_ms": 2000,
+            "critical": false,
+            "description": "Alert rule evaluation"
+          },
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Alert event distribution"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 500,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-alert-manager:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-api": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-api",
+        "name": "Nexus API Gateway",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Central API gateway routing to all core microservices"
+      },
+      "spec": {
+        "type": "gateway",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "https",
+            "port": 443,
+            "description": "External HTTPS API"
+          },
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "Internal gRPC routing"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-wallet",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 2000,
+            "critical": true,
+            "description": "Wallet operations routing"
+          },
+          {
+            "target": "nexus-payment",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 2000,
+            "critical": true,
+            "description": "Payment processing routing"
+          },
+          {
+            "target": "nexus-customer",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 2000,
+            "critical": true,
+            "description": "Customer management routing"
+          },
+          {
+            "target": "nexus-betting",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 2000,
+            "critical": true,
+            "description": "Betting engine routing"
+          },
+          {
+            "target": "nexus-session",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 2000,
+            "critical": true,
+            "description": "Session management routing"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 50,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "scaling": {
+          "min_replicas": 3,
+          "max_replicas": 10,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-audit": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-audit",
+        "name": "Nexus Audit Service",
+        "domain": "nexus-compliance",
+        "team": "nexus-security",
+        "description": "Audit logging and compliance trail management"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-audit",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Audit log store"
+          },
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Audit event distribution"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 1000,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-audit:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-betting": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-betting",
+        "name": "Nexus Betting Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Core betting engine: bet placement, settlement, and odds management"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-betting",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Bet records store"
+          },
+          {
+            "target": "nexus-redis-odds",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": true,
+            "description": "Real-time odds cache"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 100,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-betting:latest",
+        "scaling": {
+          "min_replicas": 3,
+          "max_replicas": 12,
+          "current_replicas": 4,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-bonus": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-bonus",
+        "name": "Nexus Bonus Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Bonus and promotion management: eligibility, awarding, and wagering"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-bonus",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Bonus data store"
+          },
+          {
+            "target": "nexus-redis-cache",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": false,
+            "description": "Bonus eligibility cache"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 500,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-bonus:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-cloudflare": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-cloudflare",
+        "name": "Nexus Cloudflare CDN",
+        "domain": "nexus-gateway",
+        "team": "nexus-sre",
+        "description": "Cloudflare CDN and DDoS protection for all external traffic"
+      },
+      "spec": {
+        "type": "gateway",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "https",
+            "port": 443,
+            "description": "HTTPS termination"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-alb",
+            "type": "sync",
+            "protocol": "http",
+            "timeout_ms": 3000,
+            "critical": true,
+            "description": "Origin traffic routing"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 50,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "scaling": {
+          "min_replicas": 1,
+          "max_replicas": 1,
+          "current_replicas": 1,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-compliance-checker": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-compliance-checker",
+        "name": "Nexus Compliance Checker",
+        "domain": "nexus-compliance",
+        "team": "nexus-security",
+        "description": "Regulatory compliance rule engine and audit support"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-compliance",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Compliance rule store"
+          },
+          {
+            "target": "nexus-db-audit",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Audit trail data"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 1000,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-compliance-checker:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-config-service": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-config-service",
+        "name": "Nexus Config Service",
+        "domain": "nexus-infra",
+        "team": "nexus-platform",
+        "description": "Centralized configuration management for all services"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC config API"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-config",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Config data store"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-config-service:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-customer": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-customer",
+        "name": "Nexus Customer Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Customer profile management, registration, and account lifecycle"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-customer",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Customer profile data store"
+          },
+          {
+            "target": "nexus-redis-session",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": false,
+            "description": "Session cache"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 200,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-customer:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 10,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-dashboard": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-dashboard",
+        "name": "Nexus Dashboard",
+        "domain": "nexus-backoffice",
+        "team": "nexus-frontend",
+        "description": "Admin dashboard frontend for operational monitoring"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "http",
+            "port": 3000,
+            "description": "React SPA hosting"
+          },
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "BFF gRPC"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-admin",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 2000,
+            "critical": false,
+            "description": "Admin backend BFF"
+          },
+          {
+            "target": "nexus-reporting",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 5000,
+            "critical": false,
+            "description": "Real-time reporting BFF"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-dashboard:latest",
+        "scaling": {
+          "min_replicas": 1,
+          "max_replicas": 3,
+          "current_replicas": 1,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-db-admin": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-admin",
+        "name": "Admin Database",
+        "domain": "nexus-backoffice",
+        "team": "nexus-data",
+        "description": "PostgreSQL for admin panel configuration"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 7,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-audit": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-audit",
+        "name": "Audit Database",
+        "domain": "nexus-compliance",
+        "team": "nexus-data",
+        "description": "PostgreSQL for compliance audit trail"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 90,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-betting": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-betting",
+        "name": "Betting Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for bet records and settlement"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 30,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-bonus": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-bonus",
+        "name": "Bonus Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for bonus and promotion tracking"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 14,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-compliance": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-compliance",
+        "name": "Compliance Database",
+        "domain": "nexus-compliance",
+        "team": "nexus-data",
+        "description": "PostgreSQL for regulatory compliance records"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 90,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-config": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-config",
+        "name": "Config Database",
+        "domain": "nexus-infra",
+        "team": "nexus-data",
+        "description": "PostgreSQL for service configuration store"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 7,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-customer": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-customer",
+        "name": "Customer Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for customer profiles and KYC data"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 30,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-fraud": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-fraud",
+        "name": "Fraud Database",
+        "domain": "nexus-ai",
+        "team": "nexus-data",
+        "description": "PostgreSQL for fraud detection data"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 30,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-geolocation": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-geolocation",
+        "name": "Geolocation Database",
+        "domain": "nexus-integration",
+        "team": "nexus-data",
+        "description": "PostgreSQL for geolocation and territory data"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 14,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-loyalty": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-loyalty",
+        "name": "Loyalty Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for loyalty points and rewards"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 14,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-odds": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-odds",
+        "name": "Odds Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for real-time odds calculation"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 30,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-payment": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-payment",
+        "name": "Payment Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for payment processing and history"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 30,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-recommendations": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-recommendations",
+        "name": "Recommendations Database",
+        "domain": "nexus-ai",
+        "team": "nexus-data",
+        "description": "PostgreSQL for AI recommendation models"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 14,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-reporting": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-reporting",
+        "name": "Reporting Database",
+        "domain": "nexus-backoffice",
+        "team": "nexus-data",
+        "description": "PostgreSQL for business reporting and analytics"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 14,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-risk": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-risk",
+        "name": "Risk Database",
+        "domain": "nexus-compliance",
+        "team": "nexus-data",
+        "description": "PostgreSQL for risk engine data and models"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 30,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-session": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-session",
+        "name": "Session Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for user session state"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 14,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-db-wallet": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-db-wallet",
+        "name": "Wallet Database",
+        "domain": "nexus-core",
+        "team": "nexus-data",
+        "description": "PostgreSQL for wallet balances and transactions"
+      },
+      "spec": {
+        "type": "datastore",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "postgres",
+            "port": 5432,
+            "description": "PostgreSQL protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ],
+        "backup": {
+          "enabled": true,
+          "retention_days": 30,
+          "frequency": "daily",
+          "storage_location": "s3://nexus-backups"
+        }
+      }
+    },
+    "nexus-eks-inference": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-eks-inference",
+        "name": "Nexus EKS Inference Nodes",
+        "domain": "nexus-ai",
+        "team": "nexus-data",
+        "description": "GPU-enabled EKS nodes for ML inference workloads"
+      },
+      "spec": {
+        "type": "compute",
+        "tier": 1,
+        "lifecycle": "active",
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network connectivity"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ]
+      }
+    },
+    "nexus-eks-workers": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-eks-workers",
+        "name": "Nexus EKS Worker Nodes",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Primary EKS worker node group for microservices"
+      },
+      "spec": {
+        "type": "compute",
+        "tier": 0,
+        "lifecycle": "active",
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network connectivity"
+          },
+          {
+            "target": "nexus-subnet-private",
+            "type": "infra",
+            "critical": false,
+            "description": "Subnet placement"
+          }
+        ]
+      }
+    },
+    "nexus-email": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-email",
+        "name": "Nexus Email Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Email template rendering and delivery via SMTP providers"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Email event consumption"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-email:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "current_replicas": 2,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-feature-flags": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-feature-flags",
+        "name": "Nexus Feature Flags",
+        "domain": "nexus-infra",
+        "team": "nexus-platform",
+        "description": "Feature flag management and rollout control"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "http",
+            "port": 8080,
+            "description": "Feature flag HTTP API"
+          },
+          {
+            "name": "grpc",
+            "port": 8081,
+            "description": "gRPC SDK endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-redis-cache",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": true,
+            "description": "Flag state cache"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-feature-flags:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-fraud-detection": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-fraud-detection",
+        "name": "Nexus Fraud Detection",
+        "domain": "nexus-ai",
+        "team": "nexus-data",
+        "description": "Real-time fraud detection using ML models and behavioral analysis"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-fraud",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Fraud model data store"
+          },
+          {
+            "target": "nexus-redis-cache",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": false,
+            "description": "Fraud score cache"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 200,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-fraud-detection:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-geolocation": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-geolocation",
+        "name": "Nexus Geolocation Service",
+        "domain": "nexus-integration",
+        "team": "nexus-backend",
+        "description": "Territory detection, geo-fencing, and jurisdiction compliance"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-geolocation",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Geolocation data store"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 500,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-geolocation:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-grafana": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-grafana",
+        "name": "Nexus Grafana",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "Grafana dashboards and visualization"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "http",
+            "port": 3000,
+            "description": "Grafana web UI"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-prometheus",
+            "type": "sync",
+            "protocol": "http",
+            "timeout_ms": 3000,
+            "critical": false,
+            "description": "Metrics queries"
+          },
+          {
+            "target": "nexus-loki",
+            "type": "sync",
+            "protocol": "http",
+            "timeout_ms": 3000,
+            "critical": false,
+            "description": "Log queries"
+          },
+          {
+            "target": "nexus-tempo",
+            "type": "sync",
+            "protocol": "http",
+            "timeout_ms": 3000,
+            "critical": false,
+            "description": "Trace queries"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-grafana:latest",
+        "scaling": {
+          "min_replicas": 1,
+          "max_replicas": 2,
+          "current_replicas": 1,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-identity": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-identity",
+        "name": "Nexus Identity Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Authentication, authorization, and identity provider integration"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC auth endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "OIDC discovery endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-customer",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "User identity data"
+          },
+          {
+            "target": "nexus-redis-session",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": true,
+            "description": "Token cache"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 100,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-identity:latest",
+        "scaling": {
+          "min_replicas": 3,
+          "max_replicas": 8,
+          "current_replicas": 3,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-kyc": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-kyc",
+        "name": "Nexus KYC Service",
+        "domain": "nexus-compliance",
+        "team": "nexus-security",
+        "description": "Know Your Customer verification and document processing"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-customer",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Customer identity data"
+          },
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "KYC event distribution"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 1000,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-kyc:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-log-aggregator": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-log-aggregator",
+        "name": "Nexus Log Aggregator",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "Centralized log aggregation pipeline"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "tcp",
+            "port": 5140,
+            "description": "Syslog TCP endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Log event distribution"
+          },
+          {
+            "target": "nexus-loki",
+            "type": "sync",
+            "protocol": "http",
+            "timeout_ms": 5000,
+            "critical": false,
+            "description": "Log forwarding"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-log-aggregator:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "current_replicas": 2,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-loki": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-loki",
+        "name": "Nexus Loki",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "Loki log aggregation and querying"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "http",
+            "port": 3100,
+            "description": "Loki HTTP API"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-s3-logs",
+            "type": "storage",
+            "protocol": "s3",
+            "critical": false,
+            "description": "Long-term log storage"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.5,
+          "latency_p99_ms": 2000,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-loki:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-loyalty": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-loyalty",
+        "name": "Nexus Loyalty Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Loyalty points, VIP tiers, and reward program management"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-loyalty",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Loyalty data store"
+          },
+          {
+            "target": "nexus-redis-cache",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": false,
+            "description": "Points balance cache"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 500,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-loyalty:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-notification": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-notification",
+        "name": "Nexus Notification Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Multi-channel notification dispatch (email, SMS, push, in-app)"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Notification event consumption"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-notification:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "current_replicas": 2,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-odds": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-odds",
+        "name": "Nexus Odds Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Real-time odds calculation and provider data aggregation"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-odds",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Odds history store"
+          },
+          {
+            "target": "nexus-redis-odds",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": true,
+            "description": "Real-time odds cache"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 100,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-odds:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 8,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-otel-collector": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-otel-collector",
+        "name": "Nexus OTel Collector",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "OpenTelemetry collector for metrics, logs, and traces"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 4317,
+            "description": "OTLP gRPC endpoint"
+          },
+          {
+            "name": "http",
+            "port": 4318,
+            "description": "OTLP HTTP endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-prometheus",
+            "type": "async",
+            "protocol": "http",
+            "critical": false,
+            "description": "Push metrics"
+          },
+          {
+            "target": "nexus-loki",
+            "type": "async",
+            "protocol": "http",
+            "critical": false,
+            "description": "Push logs"
+          },
+          {
+            "target": "nexus-tempo",
+            "type": "async",
+            "protocol": "http",
+            "critical": false,
+            "description": "Push traces"
+          },
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Event forwarding"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 200,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-otel-collector:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-payment": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-payment",
+        "name": "Nexus Payment Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Payment processing, provider integration, and transaction reconciliation"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-payment",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Payment transaction store"
+          },
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": true,
+            "description": "Payment event distribution"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 200,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-payment:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 8,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-prometheus": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-prometheus",
+        "name": "Nexus Prometheus",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "Prometheus metrics collection and alerting"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "http",
+            "port": 9090,
+            "description": "Prometheus HTTP API"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-redis-cache",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": false
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 500,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-prometheus:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-rabbitmq": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-rabbitmq",
+        "name": "Nexus RabbitMQ",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "RabbitMQ message broker for async event-driven communication"
+      },
+      "spec": {
+        "type": "messagebus",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "amqp",
+            "port": 5672,
+            "description": "AMQP 0-9-1 protocol"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          }
+        ]
+      }
+    },
+    "nexus-redis-cache": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-redis-cache",
+        "name": "Nexus Redis Cache",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Primary Redis cluster for application caching and rate limiting"
+      },
+      "spec": {
+        "type": "cache",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "redis",
+            "port": 6379,
+            "description": "Redis protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          }
+        ]
+      }
+    },
+    "nexus-redis-odds": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-redis-odds",
+        "name": "Nexus Redis Odds Cache",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Redis cache for real-time betting odds"
+      },
+      "spec": {
+        "type": "cache",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "redis",
+            "port": 6379,
+            "description": "Redis protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          }
+        ]
+      }
+    },
+    "nexus-redis-session": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-redis-session",
+        "name": "Nexus Redis Session Store",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Dedicated Redis instance for user session storage"
+      },
+      "spec": {
+        "type": "cache",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "redis",
+            "port": 6379,
+            "description": "Redis protocol endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "Network isolation"
+          }
+        ]
+      }
+    },
+    "nexus-reporting": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-reporting",
+        "name": "Nexus Reporting Service",
+        "domain": "nexus-backoffice",
+        "team": "nexus-data",
+        "description": "Business intelligence reporting and analytics queries"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-reporting",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Reporting data warehouse"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-reporting:latest",
+        "scaling": {
+          "min_replicas": 1,
+          "max_replicas": 4,
+          "current_replicas": 1,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-risk-engine": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-risk-engine",
+        "name": "Nexus Risk Engine",
+        "domain": "nexus-compliance",
+        "team": "nexus-data",
+        "description": "Real-time risk assessment and limit management"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-risk",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Risk model data store"
+          },
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Risk event distribution"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.9,
+          "latency_p99_ms": 1000,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-risk-engine:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-s3-backups": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-s3-backups",
+        "name": "Nexus S3 Backups Bucket",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "S3 bucket for all database and service backups"
+      },
+      "spec": {
+        "type": "storage",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "https",
+            "port": 443,
+            "description": "S3 HTTPS endpoint"
+          }
+        ],
+        "depends_on": []
+      }
+    },
+    "nexus-s3-logs": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-s3-logs",
+        "name": "Nexus S3 Logs Bucket",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "S3 bucket for long-term log retention and compliance"
+      },
+      "spec": {
+        "type": "storage",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "https",
+            "port": 443,
+            "description": "S3 HTTPS endpoint"
+          }
+        ],
+        "depends_on": []
+      }
+    },
+    "nexus-s3-traces": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-s3-traces",
+        "name": "Nexus S3 Traces Bucket",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "S3 bucket for distributed trace storage"
+      },
+      "spec": {
+        "type": "storage",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "https",
+            "port": 443,
+            "description": "S3 HTTPS endpoint"
+          }
+        ],
+        "depends_on": []
+      }
+    },
+    "nexus-service-mesh": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-service-mesh",
+        "name": "Nexus Service Mesh",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Istio service mesh for traffic management and mTLS"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 15012,
+            "description": "Istiod gRPC"
+          },
+          {
+            "name": "http",
+            "port": 15014,
+            "description": "Istiod HTTP"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-api",
+            "type": "sync",
+            "protocol": "grpc",
+            "timeout_ms": 2000,
+            "critical": true,
+            "description": "Service mesh ingress"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 100,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-service-mesh:latest",
+        "scaling": {
+          "min_replicas": 3,
+          "max_replicas": 6,
+          "current_replicas": 3,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-session": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-session",
+        "name": "Nexus Session Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "User session management, token validation, and state persistence"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-session",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Session state store"
+          },
+          {
+            "target": "nexus-redis-session",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": true,
+            "description": "Fast session lookup"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 50,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-session:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 8,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-sms": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-sms",
+        "name": "Nexus SMS Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "SMS delivery via multiple provider integrations"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "SMS event consumption"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-sms:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-subnet-private": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-subnet-private",
+        "name": "Nexus Private Subnet",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Private subnet for application services and databases"
+      },
+      "spec": {
+        "type": "network",
+        "tier": 0,
+        "lifecycle": "active",
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "VPC containment"
+          }
+        ]
+      }
+    },
+    "nexus-subnet-public": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-subnet-public",
+        "name": "Nexus Public Subnet",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Public-facing subnet for load balancers and NAT gateways"
+      },
+      "spec": {
+        "type": "network",
+        "tier": 0,
+        "lifecycle": "active",
+        "depends_on": [
+          {
+            "target": "nexus-vpc",
+            "type": "infra",
+            "critical": false,
+            "description": "VPC containment"
+          }
+        ]
+      }
+    },
+    "nexus-tempo": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-tempo",
+        "name": "Nexus Tempo",
+        "domain": "nexus-observability",
+        "team": "nexus-sre",
+        "description": "Tempo distributed tracing backend"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 1,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 14268,
+            "description": "Jaeger gRPC endpoint"
+          },
+          {
+            "name": "http",
+            "port": 9411,
+            "description": "Zipkin HTTP endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-s3-traces",
+            "type": "storage",
+            "protocol": "s3",
+            "critical": false,
+            "description": "Long-term trace storage"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.5,
+          "latency_p99_ms": 2000,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-tempo:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 4,
+          "current_replicas": 2,
+          "strategy": "static"
+        }
+      }
+    },
+    "nexus-vpc": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-vpc",
+        "name": "Nexus VPC",
+        "domain": "nexus-infra",
+        "team": "nexus-sre",
+        "description": "Main VPC for all NEXUS platform resources"
+      },
+      "spec": {
+        "type": "network",
+        "tier": 0,
+        "lifecycle": "active",
+        "depends_on": []
+      }
+    },
+    "nexus-wallet": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-wallet",
+        "name": "Nexus Wallet Service",
+        "domain": "nexus-core",
+        "team": "nexus-backend",
+        "description": "Customer wallet operations: deposits, withdrawals, balance management"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 0,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-db-wallet",
+            "type": "storage",
+            "protocol": "postgres",
+            "critical": true,
+            "description": "Primary wallet data store"
+          },
+          {
+            "target": "nexus-redis-cache",
+            "type": "cache",
+            "protocol": "redis",
+            "critical": false,
+            "description": "Balance cache and rate limiting"
+          }
+        ],
+        "slo": {
+          "availability_percent": 99.99,
+          "latency_p99_ms": 200,
+          "latency_p95_ms": 100,
+          "error_rate_percent": 0.1,
+          "throughput_rps": 5000
+        },
+        "image": "ghcr.io/betcorewin/nexus-wallet:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 10,
+          "current_replicas": 3,
+          "strategy": "hpa"
+        }
+      }
+    },
+    "nexus-webhook": {
+      "apiVersion": "cityscope.dev/v1",
+      "kind": "Entity",
+      "metadata": {
+        "id": "nexus-webhook",
+        "name": "Nexus Webhook Service",
+        "domain": "nexus-integration",
+        "team": "nexus-backend",
+        "description": "Outbound webhook delivery for third-party integrations"
+      },
+      "spec": {
+        "type": "service",
+        "tier": 2,
+        "lifecycle": "active",
+        "protocols": [
+          {
+            "name": "grpc",
+            "port": 8080,
+            "description": "gRPC service endpoint"
+          },
+          {
+            "name": "http",
+            "port": 8081,
+            "description": "Health check endpoint"
+          }
+        ],
+        "depends_on": [
+          {
+            "target": "nexus-rabbitmq",
+            "type": "async",
+            "protocol": "amqp",
+            "critical": false,
+            "description": "Webhook event distribution"
+          }
+        ],
+        "image": "ghcr.io/betcorewin/nexus-webhook:latest",
+        "scaling": {
+          "min_replicas": 2,
+          "max_replicas": 6,
+          "current_replicas": 2,
+          "strategy": "hpa"
+        }
+      }
+    }
+  }
+}

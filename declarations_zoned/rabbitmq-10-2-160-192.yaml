@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: rabbitmq-10-2-160-192
+  name: RabbitMQ rabbitmq-10-2-160-192
+  domain: wincore-mssql
+  team: platform
+  description: RabbitMQ (implicit)
+spec:
+  type: messagebus
+  tier: 1
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: CONDUIT

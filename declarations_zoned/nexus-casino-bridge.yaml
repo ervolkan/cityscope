@@ -1,0 +1,29 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: nexus-casino-bridge
+  name: Nexus Casino Bridge
+  domain: app-postgres
+  team: nexus-backend
+  description: Auto-bootstrapped from nexus-casino-bridge-values.yaml
+  labels:
+    service_type: ClusterIP
+spec:
+  type: service
+  tier: 3
+  lifecycle: active
+  protocols:
+  - name: http
+    port: 80
+    description: http
+  depends_on:
+  - target: postgres-10-2-159-193
+    type: storage
+    protocol: postgres
+    critical: true
+    description: PostgreSQL 'nexus_orleans' via ConnectionStrings__Orleans
+  image: ghcr.io/betcorewin/nexus-casino-bridge:0ef16ed
+  scaling:
+    current_replicas: 1
+  nature: PROCESSOR
+  sub_nature: WORKER

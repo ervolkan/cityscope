@@ -1,0 +1,92 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: srv-betticket-service
+  name: Prod Srv Betticket Service
+  domain: wincore-mssql
+  team: wincore-backend
+  description: Auto-bootstrapped from srv-betticket-service-values.yaml
+  labels:
+    orleans: 'true'
+    service_type: ClusterIP
+spec:
+  type: service
+  tier: 2
+  lifecycle: active
+  protocols:
+  - name: orleans
+    port: 11111
+    description: orleans-silo
+  - name: orleans
+    port: 30000
+    description: orleans-gw
+  - name: grpc
+    port: 8080
+    description: grpc
+  - name: http
+    port: 80
+    description: api
+  - name: grpc
+    port: 8181
+    description: grpc-alt
+  depends_on:
+  - target: srv-streamnet-service
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__BetStreamServiceGrpcHost
+  - target: mssql-10-2-152-240
+    type: storage
+    protocol: mssql
+    critical: true
+    description: MSSQL 'NSWT.Context' via NSWT__Identity__Authorization__ConnectionString
+  - target: prod-docdb
+    type: storage
+    protocol: mongodb
+    critical: true
+    description: DocumentDB via NSWT__Orleans__MongoStorage__ConnectionString
+  - target: srv-customer-grpc
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__CustomerGrpcHost
+  - target: srv-branch-grpc
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__BranchGrpcHost
+  - target: srv-betrisk-grpc
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__RiskGrpcHost
+  - target: srv-betdatahub-service
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__BetDataHubGrpcGateWayHost
+  - target: srv-betcashout-service
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__BetCashoutGrpcGateWayHost
+  - target: srv-cashout-provider-service
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Orleans__Services__CashoutProviderGrpcHost
+  - target: rabbitmq-10-2-160-192
+    type: async
+    protocol: amqp
+    critical: false
+    description: RabbitMQ via NSWT__CAP__RabbitMQ__HostName
+  - target: sd-logmanagement-api
+    type: sync
+    protocol: grpc
+    critical: false
+    description: from NSWT__Logger__LogCenterGrpcHost
+  image: betplace.service:e6a52d1
+  scaling:
+    current_replicas: 1
+  nature: PROCESSOR
+  sub_nature: REACTOR

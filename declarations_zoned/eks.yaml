@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: eks
+  name: EKS Cluster prod-eks
+  domain: infrastructure
+  team: platform-infra
+  description: EKS v?
+spec:
+  type: compute
+  tier: 3
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: SUBSTRATE

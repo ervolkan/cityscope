@@ -1,4 +1,5 @@
-"""CityScope Zoning Engine
+"""
+CityScope Zoning Engine
 ========================
 Implements the two-pass architecture defined in ZONING-CODE.md:
   Pass 1 — Signal extraction (raw signals from IaC)
@@ -505,6 +506,101 @@ def classify_domains(
         domain_id = f"domain-{domain_counter:03d}"
         for eid in group:
             domain_assignments[eid] = domain_id
+
+    # ── Gravitational Pull ──────────────────────────────────────────
+    # Datastores/caches/messagebus entities with no storage_targets of
+    # their own end up as singletons (standalone). But if other entities
+    # critically depend on them, the datastore should be pulled into the
+    # domain of its heaviest dependent cohort. This makes NUCLEUS
+    # entities the gravitational center of their domain.
+    #
+    # Rule: For each standalone datastore/cache/messagebus, count critical
+    # dependents per domain. If one domain dominates, reassign the
+    # datastore to that domain. If tied or spread evenly, keep standalone.
+    # ────────────────────────────────────────────────────────────────
+    # Build reverse critical dependency map: target → [source, ...]
+    critical_dependents: dict[str, list[str]] = {eid: [] for eid in domain_assignments}
+    for edge in edges:
+        if edge.get("critical"):
+            target = edge.get("target", "")
+            source = edge.get("source", "")
+            if target in critical_dependents:
+                critical_dependents[target].append(source)
+
+    # Also count non-critical fan-in for messagebus (async dependencies)
+    all_dependents: dict[str, list[str]] = {eid: [] for eid in domain_assignments}
+    for edge in edges:
+        target = edge.get("target", "")
+        source = edge.get("source", "")
+        if target in all_dependents:
+            all_dependents[target].append(source)
+
+    # Build forward dependency map: source → [target domains]
+    forward_deps: dict[str, list[str]] = {eid: [] for eid in domain_assignments}
+    for edge in edges:
+        source = edge.get("source", "")
+        target = edge.get("target", "")
+        if source in forward_deps and target in domain_assignments:
+            forward_deps[source].append(target)
+
+    # Iterative pull — run multiple passes because pulling one entity
+    # may create enough mass to pull another (e.g., datastore pulled in
+    # first pass, then orphan service pulled in second pass via its
+    # dependency on that datastore's new domain).
+    for _pass in range(3):
+        changed = False
+        for eid, dom in list(domain_assignments.items()):
+            if dom != "standalone":
+                continue
+            if eid not in entities:
+                continue
+
+            etype = entities[eid].get("spec", {}).get("type", "")
+
+            # --- Collect domain votes from both directions ---
+            domain_votes: dict[str, int] = {}
+
+            # Votes from dependents (who depends on me?)
+            # For datastores/caches: use critical dependents (strong gravity)
+            # For messagebus: use all dependents (async = weaker but still gravity)
+            # For services: use all dependents
+            if etype in ("datastore", "cache"):
+                dep_list = critical_dependents.get(eid, [])
+            elif etype == "messagebus":
+                dep_list = all_dependents.get(eid, [])
+            else:
+                dep_list = all_dependents.get(eid, [])
+
+            for dep_eid in dep_list:
+                dep_dom = domain_assignments.get(dep_eid, "standalone")
+                if dep_dom not in ("standalone", "infrastructure"):
+                    # Weight: critical dependents count double
+                    weight = 2 if dep_eid in (critical_dependents.get(eid, [])) else 1
+                    domain_votes[dep_dom] = domain_votes.get(dep_dom, 0) + weight
+
+            # Votes from my own dependencies (who do I depend on?)
+            # If I depend on entities in a specific domain, that pulls me too.
+            for target_eid in forward_deps.get(eid, []):
+                target_dom = domain_assignments.get(target_eid, "standalone")
+                if target_dom not in ("standalone", "infrastructure"):
+                    # Forward deps count as 1 vote each
+                    domain_votes[target_dom] = domain_votes.get(target_dom, 0) + 1
+
+            if not domain_votes:
+                continue
+
+            # Find dominant domain
+            sorted_doms = sorted(domain_votes.items(), key=lambda x: -x[1])
+            dominant_dom, dominant_count = sorted_doms[0]
+            total_votes = sum(domain_votes.values())
+
+            # Pull if dominant domain has >50% of votes
+            if dominant_count > total_votes * 0.5:
+                domain_assignments[eid] = dominant_dom
+                changed = True
+
+        if not changed:
+            break
 
     return domain_assignments
 

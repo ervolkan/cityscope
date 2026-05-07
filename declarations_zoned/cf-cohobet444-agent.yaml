@@ -1,0 +1,15 @@
+apiVersion: cityscope.dev/v1
+kind: Entity
+metadata:
+  id: cf-cohobet444-agent
+  name: Cloudflare agent
+  domain: infrastructure
+  team: platform-infra
+  description: 'DNS record: agent'
+spec:
+  type: gateway
+  tier: 1
+  lifecycle: active
+  protocols: []
+  depends_on: []
+  nature: MEMBRANE
